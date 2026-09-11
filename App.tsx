@@ -27,8 +27,8 @@ const App: React.FC = () => {
             setApartments(await StorageService.getApartments());
         } catch (error: any) {
             console.error("Initialization Error:", error);
-            // Check for PocketBase permission error (403 or message)
-            if (error.status === 403 || error.message?.includes('superuser')) {
+            // Check for Supabase permission/config error
+            if (error.code === 'PGRST301' || error.message?.includes('permission') || error.message?.includes('42P01')) {
                 setPermissionError(true);
             }
         } finally {
@@ -103,11 +103,11 @@ const App: React.FC = () => {
                   <div className="bg-red-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
                       <AlertTriangle className="w-10 h-10 text-red-600" />
                   </div>
-                  <h1 className="text-3xl font-bold text-gray-900 mb-4">Configuración Requerida: PocketBase</h1>
+                  <h1 className="text-3xl font-bold text-gray-900 mb-4">Configuración Requerida: Supabase</h1>
                   <p className="text-gray-600 text-lg mb-8">
                       La aplicación está conectada, pero <strong>no tiene permisos</strong> para leer los datos.
                       <br/>
-                      Las "API Rules" de tu base de datos están bloqueadas.
+                      Las políticas RLS de tu base de datos están bloqueando el acceso.
                   </p>
 
                   <div className="text-left bg-gray-50 p-6 rounded-xl border border-gray-200 mb-8">
@@ -116,16 +116,12 @@ const App: React.FC = () => {
                           Cómo solucionar esto (Pasos):
                       </h3>
                       <ol className="list-decimal list-inside space-y-3 text-gray-700">
-                          <li>Entra a tu panel de PocketBase (<code>/_/</code>).</li>
-                          <li>Ve a la sección <strong>Collections</strong> (menú izquierdo).</li>
-                          <li>Haz clic en el engranaje <strong>Settings</strong> de la colección <code>apartments</code>.</li>
-                          <li>Selecciona <strong>API Rules</strong>.</li>
-                          <li>
-                              <strong>Borra el texto</strong> en los campos "List", "View", "Create", "Update", "Delete".
-                              <br/>
-                              <span className="text-sm text-gray-500 italic">(Deben quedar vacíos para ser públicos, o mostrar un candado abierto).</span>
-                          </li>
-                          <li>Repite esto para las colecciones: <code>recommendations</code>, <code>inventory</code>, <code>cleaning_logs</code>, <code>maintenance</code>, <code>users</code> y <code>roles</code>.</li>
+                          <li>Entra a tu panel de Supabase (<a href="https://supabase.com/dashboard" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">supabase.com/dashboard</a>).</li>
+                          <li>Ve a la sección <strong>Authentication</strong> → <strong>Policies</strong> (menú izquierdo).</li>
+                          <li>Selecciona la tabla <code>apartments</code>.</li>
+                          <li>Asegúrate de que exista una política <strong>"Allow all for anon"</strong> habilitada.</li>
+                          <li>Repite esto para las tablas: <code>recommendations</code>, <code>inventory</code>, <code>cleaning_logs</code>, <code>cleaning_templates</code>, <code>maintenance</code>, <code>users</code> y <code>roles</code>.</li>
+                          <li>Verifica que la variable de entorno <code>SUPABASE_URL</code> y <code>SUPABASE_ANON_KEY</code> estén configuradas correctamente.</li>
                       </ol>
                   </div>
 
@@ -144,7 +140,7 @@ const App: React.FC = () => {
       return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-600 mb-4"></div>
-            <p className="text-gray-400 font-medium">Conectando con PocketBase...</p>
+            <p className="text-gray-400 font-medium">Conectando con Supabase...</p>
         </div>
       );
   }
@@ -192,21 +188,21 @@ const App: React.FC = () => {
                              <div className="flex items-center justify-center gap-2 font-bold">
                                  <AlertTriangle className="w-4 h-4"/> {loginError}
                              </div>
-                             {showUserHelp && (
-                                 <div className="text-left text-xs text-gray-600 mt-2 bg-white p-3 rounded border border-red-100">
-                                     <p className="font-bold mb-1">Posible causa: Permisos de Base de Datos</p>
-                                     <p>La app no puede leer la lista de usuarios. Por defecto, PocketBase bloquea la colección 'users'.</p>
-                                     <div className="mt-2 pt-2 border-t">
-                                         <strong>Solución:</strong>
-                                         <ol className="list-decimal list-inside mt-1 space-y-1">
-                                             <li>Ve a PocketBase {'>'} Collections {'>'} <code>users</code></li>
-                                             <li>Clic en Settings {'>'} <strong>API Rules</strong></li>
-                                             <li>Borra el texto en <strong>List/Search</strong> (déjalo vacío).</li>
-                                             <li>Haz lo mismo en <strong>View</strong>.</li>
-                                         </ol>
-                                     </div>
-                                 </div>
-                             )}
+                              {showUserHelp && (
+                                  <div className="text-left text-xs text-gray-600 mt-2 bg-white p-3 rounded border border-red-100">
+                                      <p className="font-bold mb-1">Posible causa: Permisos de Base de Datos</p>
+                                      <p>La app no puede leer la lista de usuarios. Verifica que la tabla 'users' tenga permisos RLS habilitados.</p>
+                                      <div className="mt-2 pt-2 border-t">
+                                          <strong>Solución:</strong>
+                                          <ol className="list-decimal list-inside mt-1 space-y-1">
+                                              <li>Ve a Supabase {'>'} Authentication {'>'} <strong>Policies</strong></li>
+                                              <li>Selecciona la tabla <code>users</code></li>
+                                              <li>Habilita la política <strong>"Allow all for anon"</strong></li>
+                                              <li>Verifica que la tabla <code>users</code> exista y tenga la columna <code>pin</code></li>
+                                          </ol>
+                                      </div>
+                                  </div>
+                              )}
                           </div>
                       )}
                       
@@ -214,7 +210,7 @@ const App: React.FC = () => {
                           Ingresar al Sistema
                       </button>
                   </form>
-                  <p className="text-xs text-center text-gray-400 mt-6">Sistema conectado a PocketBase.</p>
+                      <p className="text-xs text-center text-gray-400 mt-6">Sistema conectado a Supabase.</p>
               </div>
           </div>
       )}
