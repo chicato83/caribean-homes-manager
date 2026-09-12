@@ -1,13 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
-import { Upload, FileText, Plus, Trash2, Eye, Printer, Download, ArrowLeft, CheckCircle, AlertCircle } from 'lucide-react';
+import { Upload, FileText, Plus, Trash2, Eye, Printer, Download, ArrowLeft, CheckCircle, AlertCircle, Edit2 } from 'lucide-react';
 import { StorageService } from '../services/storageService';
 import { Apartment, SavedReport, ReportData } from '../types';
 
 // Configure pdf.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.4.449/build/pdf.worker.min.mjs';
 
-type ReportStep = 'list' | 'select-apartment' | 'upload' | 'preview' | 'saved-reports';
+// Logo URLs
+const AIRBNB_LOGO = '/assets/airbnb-logo.png';
+const CARIBEAN_LOGO = '/assets/caribean-homes-logo.png';
+
+type ReportStep = 'list' | 'select-apartment' | 'upload' | 'preview' | 'view';
 
 const INITIAL_REPORT_DATA: ReportData = {
   period: '',
@@ -42,51 +46,38 @@ export const ReportsManager: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [rateLoading, setRateLoading] = useState(false);
   const [rateSource, setRateSource] = useState<string | null>(null);
+  const [editingReportId, setEditingReportId] = useState<string | null>(null);
+  const [viewingReport, setViewingReport] = useState<SavedReport | null>(null);
+  const reportRef = useRef<HTMLDivElement>(null);
 
   // Auto-fetch Banco Cibao exchange rate from TasaReal API
   const fetchBancoCibaoRate = async () => {
     const apiKey = import.meta.env.VITE_TASAREAL_API_KEY;
-    if (!apiKey) {
-      console.warn('VITE_TASAREAL_API_KEY not configured');
-      return;
-    }
+    if (!apiKey) return;
 
     setRateLoading(true);
     try {
       const response = await fetch(
         'https://tasareal.com/api/v1/rates?institution=cibao&currency=USD',
         {
-          headers: {
-            'Authorization': `Bearer ${apiKey}`,
-          },
+          headers: { 'Authorization': `Bearer ${apiKey}` },
         }
       );
 
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
-      }
+      if (!response.ok) throw new Error(`API error: ${response.status}`);
 
       const data = await response.json();
-
-      // Get the sell rate (what you pay to buy USD) or buy rate as fallback
-      const cibaoRate = data.rates?.find(
-        (r: any) => r.institution === 'cibao'
-      );
+      const cibaoRate = data.rates?.find((r: any) => r.institution === 'cibao');
 
       if (cibaoRate) {
         const rate = cibaoRate.sell || cibaoRate.buy;
         if (rate) {
-          setReportData(prev => ({
-            ...prev,
-            tasa_banco_cibao: rate.toString(),
-          }));
+          setReportData(prev => ({ ...prev, tasa_banco_cibao: rate.toString() }));
           setRateSource(`TasaReal.com • ${data.date}`);
-          console.log(`Banco Cibao rate loaded: ${rate} DOP/USD`);
         }
       }
     } catch (err) {
       console.error('Error fetching Banco Cibao rate:', err);
-      // Silent fail - user can still enter rate manually
     }
     setRateLoading(false);
   };
@@ -126,9 +117,12 @@ export const ReportsManager: React.FC = () => {
       for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
         const textContent = await page.getTextContent();
+        // Join with space but also keep newlines for better parsing
         const pageText = textContent.items.map((item: any) => item.str).join(' ');
         fullText += pageText + '\n';
       }
+
+      console.log('PDF full text:', fullText); // Debug: see what text we extract
 
       const parsedData = parseAirbnbReport(fullText, selectedApartment.name);
       setReportData(parsedData);
@@ -143,15 +137,41 @@ export const ReportsManager: React.FC = () => {
   const parseAirbnbReport = (text: string, apartmentName: string): ReportData => {
     const data: ReportData = { ...INITIAL_REPORT_DATA };
 
-    // Extract period
-    const periodMatch = text.match(/(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\s+\d{4}/i);
+    // Extract period - try multiple formats
+    const periodMatch = text.match(/(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\s+\d{4}/i)
+      || text.match(/(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}/i);
     if (periodMatch) {
       data.period = periodMatch[0];
     }
 
-    // Extract amounts (USD)
+    // Extract nights reserved - try multiple patterns
+    // Pattern 1: "Noches reservadas: X" or "X noches reservadas"
+    const nightsPatterns = [
+      /noches?\s+reservadas?\s*[:=]?\s*(\d+)/i,
+      /(\d+)\s+noches?\s+reservadas?/i,
+      /reserved?\s+nights?\s*[:=]?\s*(\d+)/i,
+      /(\d+)\s+reserved?\s+nights?/i,
+      /night(?:s)?\s+(?:booked|reserved)\s*[:=]?\s*(\d+)/i,
+      /(\d+)\s+night(?:s)?\s+(?:booked|reserved)/i,
+      // Airbnb specific: often appears as "Noche(s)" with number nearby
+      /noche\s*\(?s?\)?\s*[:=]?\s*(\d+)/i,
+      /(\d+)\s*noche\s*\(?s?\)?/i,
+    ];
+
+    for (const pattern of nightsPatterns) {
+      const match = text.match(pattern);
+      if (match) {
+        data.stats.noches_reservadas = match[1];
+        console.log('Nights matched:', match[1], 'with pattern:', pattern.source);
+        break;
+      }
+    }
+
+    // Extract amounts (USD) - handle various formats
     const amounts = text.match(/\$[\d,]+\.?\d*/g) || [];
     const numbers = amounts.map(a => parseFloat(a.replace(/[$,]/g, '')));
+
+    console.log('Extracted amounts:', numbers); // Debug
 
     // Typical Airbnb report structure
     if (numbers.length >= 4) {
@@ -159,13 +179,7 @@ export const ReportsManager: React.FC = () => {
       data.summary.ajustes = numbers[1]?.toFixed(2) || '0.00';
       data.summary.tarifas_servicio = numbers[2]?.toFixed(2) || '0.00';
       data.summary.impuestos_retenidos = numbers[3]?.toFixed(2) || '0.00';
-      data.summary.total_usd = numbers[4]?.toFixed(2) || '0.00';
-    }
-
-    // Extract nights
-    const nightsMatch = text.match(/(\d+)\s*noche/i);
-    if (nightsMatch) {
-      data.stats.noches_reservadas = nightsMatch[1];
+      data.summary.total_usd = numbers[4]?.toFixed(2) || numbers[0].toFixed(2);
     }
 
     // Add accommodation entry
@@ -207,20 +221,28 @@ export const ReportsManager: React.FC = () => {
   }, [reportData.summary.total_usd, reportData.tasa_banco_cibao]);
 
   const handleSave = async () => {
-    const newReport: SavedReport = {
-      id: `rpt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      apartmentId: selectedApartment?.id || '',
-      apartmentName: selectedApartment?.name || '',
+    const report: SavedReport = {
+      id: editingReportId || `rpt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      apartmentId: selectedApartment?.id || viewingReport?.apartmentId || '',
+      apartmentName: selectedApartment?.name || viewingReport?.apartmentName || '',
       period: reportData.period || 'Sin periodo',
-      generatedAt: new Date().toISOString(),
+      generatedAt: editingReportId ? (viewingReport?.generatedAt || new Date().toISOString()) : new Date().toISOString(),
       reportData,
     };
 
-    await StorageService.saveReport(newReport);
-    setReports([newReport, ...reports]);
+    await StorageService.saveReport(report);
+
+    if (editingReportId) {
+      setReports(reports.map(r => r.id === editingReportId ? report : r));
+    } else {
+      setReports([report, ...reports]);
+    }
+
     setStep('list');
     setSelectedApartment(null);
     setReportData(INITIAL_REPORT_DATA);
+    setEditingReportId(null);
+    setViewingReport(null);
   };
 
   const handleDelete = async (id: string) => {
@@ -229,10 +251,211 @@ export const ReportsManager: React.FC = () => {
     setReports(reports.filter(r => r.id !== id));
   };
 
+  const handleEdit = (report: SavedReport) => {
+    const apt = apartments.find(a => a.id === report.apartmentId);
+    setSelectedApartment(apt || null);
+    setReportData(report.reportData);
+    setEditingReportId(report.id);
+    setViewingReport(report);
+    setStep('preview');
+  };
+
+  const handleView = (report: SavedReport) => {
+    setViewingReport(report);
+    setSelectedApartment(apartments.find(a => a.id === report.apartmentId) || null);
+    setReportData(report.reportData);
+    setStep('view');
+  };
+
+  const handlePrint = () => {
+    const printContent = reportRef.current;
+    if (!printContent) return;
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Informe ${viewingReport?.apartmentName || ''} - ${reportData.period}</title>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: 'Segoe UI', system-ui, sans-serif; color: #1f2937; padding: 20px; }
+          .header { display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #0284c7; padding-bottom: 15px; margin-bottom: 20px; }
+          .logos { display: flex; align-items: center; gap: 20px; }
+          .logo { height: 50px; }
+          .title { text-align: right; }
+          .title h1 { font-size: 22px; color: #0284c7; }
+          .title p { font-size: 12px; color: #6b7280; }
+          .section { margin-bottom: 20px; }
+          .section h3 { font-size: 14px; color: #6b7280; text-transform: uppercase; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px; margin-bottom: 10px; }
+          .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+          .item { display: flex; justify-content: space-between; padding: 6px 10px; background: #f9fafb; border-radius: 4px; }
+          .item-label { color: #6b7280; font-size: 13px; }
+          .item-value { font-weight: 600; font-size: 13px; }
+          .total { background: #ecfdf5; border: 1px solid #bbf7d0; }
+          .total .item-value { color: #059669; font-size: 16px; }
+          .conversion { background: #eff6ff; border: 1px solid #bfdbfe; }
+          .conversion .item-value { color: #2563eb; font-size: 16px; }
+          .footer { margin-top: 30px; padding-top: 15px; border-top: 1px solid #e5e7eb; font-size: 11px; color: #9ca3af; text-align: center; }
+          @media print { body { padding: 0; } }
+        </style>
+      </head>
+      <body>
+        ${printContent.innerHTML}
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
+  };
+
+  const handleDownloadPDF = async () => {
+    const printContent = reportRef.current;
+    if (!printContent) return;
+
+    // Use html2canvas approach - open print dialog which allows Save as PDF
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Informe ${viewingReport?.apartmentName || ''} - ${reportData.period}</title>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: 'Segoe UI', system-ui, sans-serif; color: #1f2937; padding: 20px; }
+          .header { display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #0284c7; padding-bottom: 15px; margin-bottom: 20px; }
+          .logos { display: flex; align-items: center; gap: 20px; }
+          .logo { height: 50px; }
+          .title { text-align: right; }
+          .title h1 { font-size: 22px; color: #0284c7; }
+          .title p { font-size: 12px; color: #6b7280; }
+          .section { margin-bottom: 20px; }
+          .section h3 { font-size: 14px; color: #6b7280; text-transform: uppercase; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px; margin-bottom: 10px; }
+          .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+          .item { display: flex; justify-content: space-between; padding: 6px 10px; background: #f9fafb; border-radius: 4px; }
+          .item-label { color: #6b7280; font-size: 13px; }
+          .item-value { font-weight: 600; font-size: 13px; }
+          .total { background: #ecfdf5; border: 1px solid #bbf7d0; }
+          .total .item-value { color: #059669; font-size: 16px; }
+          .conversion { background: #eff6ff; border: 1px solid #bfdbfe; }
+          .conversion .item-value { color: #2563eb; font-size: 16px; }
+          .footer { margin-top: 30px; padding-top: 15px; border-top: 1px solid #e5e7eb; font-size: 11px; color: #9ca3af; text-align: center; }
+        </style>
+      </head>
+      <body>
+        ${printContent.innerHTML}
+        <script>
+          window.onload = function() { window.print(); }
+        <\/script>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
   const formatCurrency = (amount: string) => {
     const num = parseFloat(amount) || 0;
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(num);
   };
+
+  const formatCurrencyRD = (amount: string) => {
+    const num = parseFloat(amount) || 0;
+    return new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' }).format(num);
+  };
+
+  // Report content component (reused in preview, view, and print)
+  const ReportContent = () => (
+    <div>
+      {/* Header with logos */}
+      <div className="flex items-center justify-between border-b-4 border-brand-600 pb-4 mb-6">
+        <div className="flex items-center gap-4">
+          <img src={AIRBNB_LOGO} alt="Airbnb" className="h-10" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+          <div className="w-px h-10 bg-gray-300"></div>
+          <img src={CARIBEAN_LOGO} alt="CaribeanHomes" className="h-10" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+        </div>
+        <div className="text-right">
+          <h1 className="text-xl font-bold text-brand-600">Caribean<span className="text-gray-800">Homes</span></h1>
+          <p className="text-xs text-gray-500">Property Management Report</p>
+        </div>
+      </div>
+
+      {/* Title */}
+      <div className="text-center mb-6">
+        <h2 className="text-lg font-bold text-gray-800">
+          Informe de Ingresos {viewingReport?.apartmentName || selectedApartment?.name || ''}
+        </h2>
+        <p className="text-sm text-gray-500">Período: {reportData.period || 'No especificado'} | Fecha: {reportData.reportDate}</p>
+      </div>
+
+      {/* Financial Summary */}
+      <div className="section">
+        <h3>Resumen Financiero</h3>
+        <div className="grid">
+          <div className="item">
+            <span className="item-label">Ingresos Brutos</span>
+            <span className="item-value">{formatCurrency(reportData.summary.ingresos_brutos)}</span>
+          </div>
+          <div className="item">
+            <span className="item-label">Ajustes</span>
+            <span className="item-value">{formatCurrency(reportData.summary.ajustes)}</span>
+          </div>
+          <div className="item">
+            <span className="item-label">Tarifas de Servicio</span>
+            <span className="item-value">{formatCurrency(reportData.summary.tarifas_servicio)}</span>
+          </div>
+          <div className="item">
+            <span className="item-label">Impuestos Retenidos</span>
+            <span className="item-value">{formatCurrency(reportData.summary.impuestos_retenidos)}</span>
+          </div>
+          <div className="item total">
+            <span className="item-label">Total USD</span>
+            <span className="item-value">{formatCurrency(reportData.summary.total_usd)}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="section">
+        <h3>Estadísticas</h3>
+        <div className="grid">
+          <div className="item">
+            <span className="item-label">Noches Reservadas</span>
+            <span className="item-value">{reportData.stats.noches_reservadas || '0'}</span>
+          </div>
+          {reportData.extra_nights && (
+            <div className="item">
+              <span className="item-label">Noches Extra</span>
+              <span className="item-value">{reportData.extra_nights}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Conversion */}
+      <div className="section">
+        <h3>Conversión a RD$</h3>
+        <div className="grid">
+          <div className="item">
+            <span className="item-label">Tasa Banco Cibao</span>
+            <span className="item-value">RD$ {reportData.tasa_banco_cibao}</span>
+          </div>
+          <div className="item conversion">
+            <span className="item-label">25% del Total (RD$)</span>
+            <span className="item-value">{reportData.conversion_result ? `RD$ ${reportData.conversion_result}` : '---'}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="footer">
+        <p>Generado por CaribeanHomes Property Management | {new Date().toLocaleDateString('es-DO')}</p>
+      </div>
+    </div>
+  );
 
   if (loading) {
     return (
@@ -295,21 +518,25 @@ export const ReportsManager: React.FC = () => {
                         <p className="text-sm text-gray-500">{report.period} • {new Date(report.generatedAt).toLocaleDateString('es-DO')}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-4">
-                      <div className="text-right">
+                    <div className="flex items-center gap-3">
+                      <div className="text-right mr-2">
                         <p className="text-lg font-bold text-green-600">{formatCurrency(report.reportData.summary.total_usd)}</p>
-                        <p className="text-xs text-gray-400">{report.reportData.stats.noches_reservadas} noches</p>
+                        <p className="text-xs text-gray-400">{report.reportData.stats.noches_reservadas || '0'} noches</p>
                       </div>
+                      {/* Action buttons */}
                       <button
-                        onClick={() => {
-                          setSelectedApartment(apartments.find(a => a.id === report.apartmentId) || null);
-                          setReportData(report.reportData);
-                          setStep('preview');
-                        }}
-                        className="p-2 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
+                        onClick={() => handleView(report)}
+                        className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                         title="Ver informe"
                       >
                         <Eye className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={() => handleEdit(report)}
+                        className="p-2 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                        title="Editar informe"
+                      >
+                        <Edit2 className="w-5 h-5" />
                       </button>
                       <button
                         onClick={() => handleDelete(report.id)}
@@ -340,10 +567,7 @@ export const ReportsManager: React.FC = () => {
             {apartments.map(apt => (
               <button
                 key={apt.id}
-                onClick={() => {
-                  setSelectedApartment(apt);
-                  setStep('upload');
-                }}
+                onClick={() => { setSelectedApartment(apt); setStep('upload'); }}
                 className="p-6 border-2 border-gray-200 rounded-xl hover:border-brand-500 hover:bg-brand-50 transition-all text-left group"
               >
                 <div className="w-12 h-12 bg-brand-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-brand-200 transition-colors">
@@ -379,43 +603,20 @@ export const ReportsManager: React.FC = () => {
             <label className="inline-flex items-center gap-2 bg-brand-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:bg-brand-700 transition-all cursor-pointer">
               <Upload className="w-5 h-5" />
               {uploading ? 'Procesando...' : 'Seleccionar PDF'}
-              <input
-                type="file"
-                accept=".pdf"
-                onChange={handlePdfUpload}
-                disabled={uploading}
-                className="hidden"
-              />
+              <input type="file" accept=".pdf" onChange={handlePdfUpload} disabled={uploading} className="hidden" />
             </label>
           </div>
         </div>
       )}
 
-      {/* PREVIEW / EDIT */}
+      {/* PREVIEW / EDIT (new report or edit existing) */}
       {step === 'preview' && (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
           <div className="flex items-center gap-4 mb-6">
-            <button onClick={() => setStep('list')} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+            <button onClick={() => { setStep('list'); setEditingReportId(null); setViewingReport(null); }} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
               <ArrowLeft className="w-5 h-5" />
             </button>
-            <h2 className="text-xl font-bold text-gray-800">Vista Previa del Informe</h2>
-          </div>
-
-          {/* Report Header */}
-          <div className="text-center mb-8 p-6 bg-gradient-to-r from-brand-50 to-blue-50 rounded-xl">
-            <div className="flex items-center justify-center gap-4 mb-4">
-              <div className="w-16 h-16 bg-white rounded-full shadow-lg flex items-center justify-center p-2">
-                <span className="text-2xl">🏠</span>
-              </div>
-              <div className="text-left">
-                <h1 className="text-2xl font-bold text-gray-800">Caribean<span className="text-brand-600">Homes</span></h1>
-                <p className="text-sm text-gray-500">Property Management Report</p>
-              </div>
-            </div>
-            <h2 className="text-xl font-bold text-gray-700 mt-4">
-              Informe de Ingresos {selectedApartment && `- ${selectedApartment.name}`}
-            </h2>
-            <p className="text-gray-500">Período: {reportData.period || 'No especificado'}</p>
+            <h2 className="text-xl font-bold text-gray-800">{editingReportId ? 'Editar Informe' : 'Vista Previa del Informe'}</h2>
           </div>
 
           {/* Edit Form */}
@@ -424,22 +625,11 @@ export const ReportsManager: React.FC = () => {
               <h3 className="font-bold text-gray-700 border-b pb-2">Datos del Período</h3>
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Período</label>
-                <input
-                  type="text"
-                  value={reportData.period}
-                  onChange={e => setReportData({ ...reportData, period: e.target.value })}
-                  className="w-full p-2 border rounded-lg"
-                  placeholder="Ej: Octubre 2024"
-                />
+                <input type="text" value={reportData.period} onChange={e => setReportData({ ...reportData, period: e.target.value })} className="w-full p-2 border rounded-lg" placeholder="Ej: Octubre 2024" />
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Fecha del Informe</label>
-                <input
-                  type="date"
-                  value={reportData.reportDate}
-                  onChange={e => setReportData({ ...reportData, reportDate: e.target.value })}
-                  className="w-full p-2 border rounded-lg"
-                />
+                <input type="date" value={reportData.reportDate} onChange={e => setReportData({ ...reportData, reportDate: e.target.value })} className="w-full p-2 border rounded-lg" />
               </div>
             </div>
 
@@ -448,50 +638,24 @@ export const ReportsManager: React.FC = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Ingresos Brutos</label>
-                  <input
-                    type="number"
-                    value={reportData.summary.ingresos_brutos}
-                    onChange={e => setReportData({ ...reportData, summary: { ...reportData.summary, ingresos_brutos: e.target.value } })}
-                    className="w-full p-2 border rounded-lg bg-green-50 border-green-200"
-                    step="0.01"
-                  />
+                  <input type="number" value={reportData.summary.ingresos_brutos} onChange={e => setReportData({ ...reportData, summary: { ...reportData.summary, ingresos_brutos: e.target.value } })} className="w-full p-2 border rounded-lg bg-green-50 border-green-200" step="0.01" />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Ajustes</label>
-                  <input
-                    type="number"
-                    value={reportData.summary.ajustes}
-                    onChange={e => setReportData({ ...reportData, summary: { ...reportData.summary, ajustes: e.target.value } })}
-                    className="w-full p-2 border rounded-lg bg-blue-50 border-blue-200"
-                    step="0.01"
-                  />
+                  <input type="number" value={reportData.summary.ajustes} onChange={e => setReportData({ ...reportData, summary: { ...reportData.summary, ajustes: e.target.value } })} className="w-full p-2 border rounded-lg bg-blue-50 border-blue-200" step="0.01" />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Tarifas de Servicio</label>
-                  <input
-                    type="number"
-                    value={reportData.summary.tarifas_servicio}
-                    onChange={e => setReportData({ ...reportData, summary: { ...reportData.summary, tarifas_servicio: e.target.value } })}
-                    className="w-full p-2 border rounded-lg bg-orange-50 border-orange-200"
-                    step="0.01"
-                  />
+                  <input type="number" value={reportData.summary.tarifas_servicio} onChange={e => setReportData({ ...reportData, summary: { ...reportData.summary, tarifas_servicio: e.target.value } })} className="w-full p-2 border rounded-lg bg-orange-50 border-orange-200" step="0.01" />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Impuestos Retenidos</label>
-                  <input
-                    type="number"
-                    value={reportData.summary.impuestos_retenidos}
-                    onChange={e => setReportData({ ...reportData, summary: { ...reportData.summary, impuestos_retenidos: e.target.value } })}
-                    className="w-full p-2 border rounded-lg bg-red-50 border-red-200"
-                    step="0.01"
-                  />
+                  <input type="number" value={reportData.summary.impuestos_retenidos} onChange={e => setReportData({ ...reportData, summary: { ...reportData.summary, impuestos_retenidos: e.target.value } })} className="w-full p-2 border rounded-lg bg-red-50 border-red-200" step="0.01" />
                 </div>
               </div>
               <div className="bg-gray-100 p-3 rounded-lg">
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Total USD</label>
-                <div className="text-2xl font-bold text-gray-800">
-                  {formatCurrency(reportData.summary.total_usd)}
-                </div>
+                <div className="text-2xl font-bold text-gray-800">{formatCurrency(reportData.summary.total_usd)}</div>
               </div>
             </div>
 
@@ -500,23 +664,11 @@ export const ReportsManager: React.FC = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Noches Reservadas</label>
-                  <input
-                    type="number"
-                    value={reportData.stats.noches_reservadas}
-                    onChange={e => setReportData({ ...reportData, stats: { ...reportData.stats, noches_reservadas: e.target.value } })}
-                    className="w-full p-2 border rounded-lg bg-blue-50 border-blue-200"
-                    placeholder="0"
-                  />
+                  <input type="number" value={reportData.stats.noches_reservadas} onChange={e => setReportData({ ...reportData, stats: { ...reportData.stats, noches_reservadas: e.target.value } })} className="w-full p-2 border rounded-lg bg-blue-50 border-blue-200" placeholder="0" />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Noches Extra</label>
-                  <input
-                    type="number"
-                    value={reportData.extra_nights}
-                    onChange={e => setReportData({ ...reportData, extra_nights: e.target.value })}
-                    className="w-full p-2 border rounded-lg bg-blue-50 border-blue-200"
-                    placeholder="0"
-                  />
+                  <input type="number" value={reportData.extra_nights} onChange={e => setReportData({ ...reportData, extra_nights: e.target.value })} className="w-full p-2 border rounded-lg bg-blue-50 border-blue-200" placeholder="0" />
                 </div>
               </div>
             </div>
@@ -527,29 +679,12 @@ export const ReportsManager: React.FC = () => {
                 <div className="flex-1">
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Tasa Banco Cibao (RD$)</label>
                   <div className="flex gap-2">
-                    <input
-                      type="number"
-                      value={reportData.tasa_banco_cibao}
-                      onChange={e => setReportData({ ...reportData, tasa_banco_cibao: e.target.value })}
-                      className="flex-1 p-2 border rounded-lg border-green-300"
-                      step="0.01"
-                    />
-                    <button
-                      onClick={fetchBancoCibaoRate}
-                      disabled={rateLoading}
-                      className="px-3 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors disabled:opacity-50"
-                      title="Actualizar tasa desde TasaReal.com"
-                    >
-                      {rateLoading ? (
-                        <span className="animate-spin">⟳</span>
-                      ) : (
-                        <span>🔄</span>
-                      )}
+                    <input type="number" value={reportData.tasa_banco_cibao} onChange={e => setReportData({ ...reportData, tasa_banco_cibao: e.target.value })} className="flex-1 p-2 border rounded-lg border-green-300" step="0.01" />
+                    <button onClick={fetchBancoCibaoRate} disabled={rateLoading} className="px-3 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors disabled:opacity-50" title="Actualizar tasa">
+                      {rateLoading ? <span className="animate-spin">⟳</span> : <span>🔄</span>}
                     </button>
                   </div>
-                  {rateSource && (
-                    <p className="text-xs text-green-600 mt-1">✓ {rateSource}</p>
-                  )}
+                  {rateSource && <p className="text-xs text-green-600 mt-1">✓ {rateSource}</p>}
                 </div>
                 <div className="flex-1 bg-gray-50 p-4 rounded-lg">
                   <div className="text-xs text-gray-500">Resultado 25% (RD$)</div>
@@ -559,54 +694,44 @@ export const ReportsManager: React.FC = () => {
             </div>
           </div>
 
-          {/* Preview Report */}
-          <div className="mb-8 p-6 bg-gray-50 rounded-xl border border-gray-200">
-            <h3 className="font-bold text-gray-700 mb-4">Vista Previa del Informe</h3>
-            <div className="bg-white p-6 rounded-lg shadow-sm">
-              <div className="flex items-center gap-4 mb-6">
-                <div className="w-12 h-12 bg-brand-100 rounded-full flex items-center justify-center">
-                  <span className="text-xl">🏠</span>
-                </div>
-                <div>
-                  <h4 className="font-bold text-gray-800">CaribeanHomes</h4>
-                  <p className="text-sm text-gray-500">{selectedApartment?.name || 'Apartamento'}</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="text-gray-500">Período:</span>
-                  <span className="ml-2 font-medium">{reportData.period || 'N/A'}</span>
-                </div>
-                <div>
-                  <span className="text-gray-500">Noches:</span>
-                  <span className="ml-2 font-medium">{reportData.stats.noches_reservadas || '0'}</span>
-                </div>
-                <div>
-                  <span className="text-gray-500">Total USD:</span>
-                  <span className="ml-2 font-bold text-green-600">{formatCurrency(reportData.summary.total_usd)}</span>
-                </div>
-                <div>
-                  <span className="text-gray-500">25% en RD$:</span>
-                  <span className="ml-2 font-bold text-blue-600">{reportData.conversion_result ? `RD$ ${reportData.conversion_result}` : '---'}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
           {/* Actions */}
           <div className="flex justify-end gap-4">
-            <button
-              onClick={() => setStep('list')}
-              className="px-6 py-3 border border-gray-300 rounded-xl font-medium hover:bg-gray-50 transition-colors"
-            >
+            <button onClick={() => { setStep('list'); setEditingReportId(null); setViewingReport(null); }} className="px-6 py-3 border border-gray-300 rounded-xl font-medium hover:bg-gray-50 transition-colors">
               Cancelar
             </button>
-            <button
-              onClick={handleSave}
-              className="bg-brand-600 text-white px-8 py-3 rounded-xl font-bold shadow-lg hover:bg-brand-700 transition-all hover:scale-105 flex items-center"
-            >
-              <CheckCircle className="w-5 h-5 mr-2" /> Guardar Informe
+            <button onClick={handleSave} className="bg-brand-600 text-white px-8 py-3 rounded-xl font-bold shadow-lg hover:bg-brand-700 transition-all hover:scale-105 flex items-center">
+              <CheckCircle className="w-5 h-5 mr-2" /> {editingReportId ? 'Guardar Cambios' : 'Guardar Informe'}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* VIEW REPORT (read-only with actions) */}
+      {step === 'view' && viewingReport && (
+        <div>
+          {/* Action bar */}
+          <div className="flex items-center gap-3 mb-6">
+            <button onClick={() => { setStep('list'); setViewingReport(null); }} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <h2 className="text-xl font-bold text-gray-800 flex-1">Informe: {viewingReport.apartmentName}</h2>
+            <button onClick={() => handleEdit(viewingReport)} className="px-4 py-2 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 transition-colors flex items-center gap-2 font-medium">
+              <Edit2 className="w-4 h-4" /> Editar
+            </button>
+            <button onClick={handlePrint} className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors flex items-center gap-2 font-medium">
+              <Printer className="w-4 h-4" /> Imprimir
+            </button>
+            <button onClick={handleDownloadPDF} className="px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors flex items-center gap-2 font-medium">
+              <Download className="w-4 h-4" /> Descargar PDF
+            </button>
+            <button onClick={() => handleDelete(viewingReport.id)} className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors flex items-center gap-2 font-medium">
+              <Trash2 className="w-4 h-4" /> Eliminar
+            </button>
+          </div>
+
+          {/* Report content */}
+          <div ref={reportRef} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+            <ReportContent />
           </div>
         </div>
       )}
