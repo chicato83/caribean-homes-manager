@@ -206,7 +206,9 @@ export const ReportsManager: React.FC = () => {
   };
 
   const calculateConversions = () => {
-    const total = parseFloat(reportData.summary.total_usd) || 0;
+    const summaryTotal = parseFloat(reportData.summary.total_usd) || 0;
+    const extraIncome = parseFloat(reportData.extra_income) || 0;
+    const total = summaryTotal + extraIncome;
     const tasa = parseFloat(reportData.tasa_banco_cibao) || 58;
     // Restar $28 fijos y luego calcular 25%
     const base = total - 28;
@@ -221,7 +223,7 @@ export const ReportsManager: React.FC = () => {
 
   useEffect(() => {
     calculateConversions();
-  }, [reportData.summary.total_usd, reportData.tasa_banco_cibao]);
+  }, [reportData.summary.total_usd, reportData.summary.ingresos_brutos, reportData.summary.ajustes, reportData.summary.tarifas_servicio, reportData.summary.impuestos_retenidos, reportData.extra_income, reportData.tasa_banco_cibao]);
 
   const handleSave = async () => {
     const report: SavedReport = {
@@ -712,6 +714,10 @@ export const ReportsManager: React.FC = () => {
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Impuestos Retenidos</label>
                   <input type="number" value={reportData.summary.impuestos_retenidos} onChange={e => setReportData({ ...reportData, summary: { ...reportData.summary, impuestos_retenidos: e.target.value } })} className="w-full p-2 border rounded-lg bg-red-50 border-red-200" step="0.01" />
                 </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Ingresos Adicionales</label>
+                  <input type="number" value={reportData.extra_income} onChange={e => setReportData({ ...reportData, extra_income: e.target.value })} className="w-full p-2 border rounded-lg bg-green-50 border-green-200" step="0.01" placeholder="0.00" />
+                </div>
               </div>
               <div className="bg-gray-100 p-3 rounded-lg">
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Total USD</label>
@@ -739,6 +745,35 @@ export const ReportsManager: React.FC = () => {
 
             <div className="space-y-4">
               <h3 className="font-bold text-gray-700 border-b pb-2">Conversión</h3>
+              {/* Resumen en tiempo real */}
+              <div className="bg-gray-50 p-3 rounded-lg space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Ingresos brutos:</span>
+                  <span className="font-medium">{formatCurrency(reportData.summary.ingresos_brutos)}</span>
+                </div>
+                {reportData.extra_income && parseFloat(reportData.extra_income) > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-green-700">+ Ingresos adicionales:</span>
+                    <span className="font-medium text-green-700">+{formatCurrency(reportData.extra_income)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-sm border-t border-gray-200 pt-2">
+                  <span className="text-gray-600">Total ingresos:</span>
+                  <span className="font-bold">{formatCurrency(((parseFloat(reportData.summary.total_usd) || 0) + (parseFloat(reportData.extra_income) || 0)).toString())}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-red-600">- Costo fijo:</span>
+                  <span className="font-medium text-red-600">-$28.00</span>
+                </div>
+                <div className="flex justify-between text-sm border-t border-gray-200 pt-2">
+                  <span className="text-gray-600">Base (Total - $28):</span>
+                  <span className="font-bold">{formatCurrency((((parseFloat(reportData.summary.total_usd) || 0) + (parseFloat(reportData.extra_income) || 0)) - 28).toString())}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-blue-600">25% de base:</span>
+                  <span className="font-bold text-blue-600">{reportData.percent_25_result ? formatCurrency(reportData.percent_25_result) : '---'}</span>
+                </div>
+              </div>
               <div className="flex gap-4 items-center">
                 <div className="flex-1">
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Tasa Banco Cibao (RD$)</label>
@@ -750,9 +785,9 @@ export const ReportsManager: React.FC = () => {
                   </div>
                   {rateSource && <p className="text-xs text-green-600 mt-1">✓ {rateSource}</p>}
                 </div>
-                <div className="flex-1 bg-gray-50 p-4 rounded-lg">
-                  <div className="text-xs text-gray-500">25% de (Total - $28) en RD$</div>
-                  <div className="text-xl font-bold text-gray-800">{reportData.conversion_result || '---'}</div>
+                <div className="flex-1 bg-blue-50 p-4 rounded-lg border border-blue-200">
+                  <div className="text-xs text-blue-600 font-bold uppercase mb-1">25% de (Total - $28) en RD$</div>
+                  <div className="text-2xl font-bold text-blue-700">{reportData.conversion_result ? `RD$ ${reportData.conversion_result}` : '---'}</div>
                 </div>
               </div>
             </div>
