@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
+import html2pdf from 'html2pdf.js';
 import { Upload, FileText, Plus, Trash2, Eye, Printer, Download, ArrowLeft, CheckCircle, AlertCircle, Edit2 } from 'lucide-react';
 import { StorageService } from '../services/storageService';
 import { Apartment, SavedReport, ReportData } from '../types';
@@ -145,20 +146,13 @@ export const ReportsManager: React.FC = () => {
       data.period = periodMatch[0];
     }
 
-    // Extract host name — stop at "ID de usuario", "Fecha", or newline
-    const hostPatterns = [
-      /Nombre del anfitri[oó]n\s*[:\n]?\s*([^\nIDFecha]+)/i,
-      /Nombre del anfitri[oó]n\s*\n\s*(.+)/i,
-    ];
-    for (const p of hostPatterns) {
-      const m = text.match(p);
-      if (m) {
-        let name = m[1].trim();
-        // Clean up: remove trailing labels that leaked in
-        name = name.replace(/\s*ID\s+de\s+usuario.*/i, '').trim();
-        name = name.replace(/\s*Fecha.*/i, '').trim();
-        if (name) { data.host_name = name; break; }
-      }
+    // Extract host name — everything between "Nombre del anfitrión" and "ID de usuario"
+    const hostMatch = text.match(/Nombre del anfitri[oó]n\s*[:\s]*(.+?)(?:\s*ID\s+de\s+usuario|\s*Fecha)/i);
+    if (hostMatch) {
+      let name = hostMatch[1].trim();
+      // Remove any trailing colons or dashes
+      name = name.replace(/[:\-\s]+$/, '').trim();
+      if (name) data.host_name = name;
     }
 
     // Extract host ID — just the digits after "ID de usuario"
@@ -353,49 +347,20 @@ export const ReportsManager: React.FC = () => {
   };
 
   const handleDownloadPDF = async () => {
-    const printContent = reportRef.current;
-    if (!printContent) return;
+    const content = reportRef.current;
+    if (!content) return;
 
-    // Use html2canvas approach - open print dialog which allows Save as PDF
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
+    const filename = `Informe_${viewingReport?.apartmentName || selectedApartment?.name || 'reporte'}_${reportData.period || 'sin-periodo'}.pdf`;
 
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Informe ${viewingReport?.apartmentName || ''} - ${reportData.period}</title>
-        <style>
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { font-family: 'Segoe UI', system-ui, sans-serif; color: #1f2937; padding: 20px; }
-          .header { display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #0284c7; padding-bottom: 15px; margin-bottom: 20px; }
-          .logos { display: flex; align-items: center; gap: 20px; }
-          .logo { height: 50px; }
-          .title { text-align: right; }
-          .title h1 { font-size: 22px; color: #0284c7; }
-          .title p { font-size: 12px; color: #6b7280; }
-          .section { margin-bottom: 20px; }
-          .section h3 { font-size: 14px; color: #6b7280; text-transform: uppercase; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px; margin-bottom: 10px; }
-          .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-          .item { display: flex; justify-content: space-between; padding: 6px 10px; background: #f9fafb; border-radius: 4px; }
-          .item-label { color: #6b7280; font-size: 13px; }
-          .item-value { font-weight: 600; font-size: 13px; }
-          .total { background: #ecfdf5; border: 1px solid #bbf7d0; }
-          .total .item-value { color: #059669; font-size: 16px; }
-          .conversion { background: #eff6ff; border: 1px solid #bfdbfe; }
-          .conversion .item-value { color: #2563eb; font-size: 16px; }
-          .footer { margin-top: 30px; padding-top: 15px; border-top: 1px solid #e5e7eb; font-size: 11px; color: #9ca3af; text-align: center; }
-        </style>
-      </head>
-      <body>
-        ${printContent.innerHTML}
-        <script>
-          window.onload = function() { window.print(); }
-        <\/script>
-      </body>
-      </html>
-    `);
-    printWindow.document.close();
+    const options = {
+      margin: 10,
+      filename,
+      image: { type: 'jpeg' as const, quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' as const },
+    };
+
+    await html2pdf().set(options).from(content).save();
   };
 
   const formatCurrency = (amount: string) => {
