@@ -33,6 +33,7 @@ const INITIAL_REPORT_DATA: ReportData = {
   percent_25_result: '',
   extra_income: '',
   extra_nights: '',
+  extra_nights_amount: '',
 };
 
 export const ReportsManager: React.FC = () => {
@@ -207,7 +208,9 @@ export const ReportsManager: React.FC = () => {
   const calculateConversions = () => {
     const total = parseFloat(reportData.summary.total_usd) || 0;
     const tasa = parseFloat(reportData.tasa_banco_cibao) || 58;
-    const percent25 = total * 0.25;
+    // Restar $28 fijos y luego calcular 25%
+    const base = total - 28;
+    const percent25 = base * 0.25;
 
     setReportData({
       ...reportData,
@@ -428,8 +431,14 @@ export const ReportsManager: React.FC = () => {
           </div>
           {reportData.extra_nights && (
             <div className="item">
-              <span className="item-label">Noches Extra</span>
+              <span className="item-label">Noches Extra (cant.)</span>
               <span className="item-value">{reportData.extra_nights}</span>
+            </div>
+          )}
+          {reportData.extra_nights_amount && (
+            <div className="item">
+              <span className="item-label">Noches Extra (USD)</span>
+              <span className="item-value">{formatCurrency(reportData.extra_nights_amount)}</span>
             </div>
           )}
         </div>
@@ -443,8 +452,12 @@ export const ReportsManager: React.FC = () => {
             <span className="item-label">Tasa Banco Cibao</span>
             <span className="item-value">RD$ {reportData.tasa_banco_cibao}</span>
           </div>
+          <div className="item">
+            <span className="item-label">Base (Total - $28)</span>
+            <span className="item-value">{formatCurrency((parseFloat(reportData.summary.total_usd) - 28).toString())}</span>
+          </div>
           <div className="item conversion">
-            <span className="item-label">25% del Total (RD$)</span>
+            <span className="item-label">25% de (Total - $28) en RD$</span>
             <span className="item-value">{reportData.conversion_result ? `RD$ ${reportData.conversion_result}` : '---'}</span>
           </div>
         </div>
@@ -661,14 +674,18 @@ export const ReportsManager: React.FC = () => {
 
             <div className="space-y-4">
               <h3 className="font-bold text-gray-700 border-b pb-2">Estadísticas</h3>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Noches Reservadas</label>
                   <input type="number" value={reportData.stats.noches_reservadas} onChange={e => setReportData({ ...reportData, stats: { ...reportData.stats, noches_reservadas: e.target.value } })} className="w-full p-2 border rounded-lg bg-blue-50 border-blue-200" placeholder="0" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Noches Extra</label>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Noches Extra (cant.)</label>
                   <input type="number" value={reportData.extra_nights} onChange={e => setReportData({ ...reportData, extra_nights: e.target.value })} className="w-full p-2 border rounded-lg bg-blue-50 border-blue-200" placeholder="0" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Noches Extra (USD)</label>
+                  <input type="number" value={reportData.extra_nights_amount} onChange={e => setReportData({ ...reportData, extra_nights_amount: e.target.value })} className="w-full p-2 border rounded-lg bg-green-50 border-green-200" step="0.01" placeholder="0.00" />
                 </div>
               </div>
             </div>
@@ -687,7 +704,7 @@ export const ReportsManager: React.FC = () => {
                   {rateSource && <p className="text-xs text-green-600 mt-1">✓ {rateSource}</p>}
                 </div>
                 <div className="flex-1 bg-gray-50 p-4 rounded-lg">
-                  <div className="text-xs text-gray-500">Resultado 25% (RD$)</div>
+                  <div className="text-xs text-gray-500">25% de (Total - $28) en RD$</div>
                   <div className="text-xl font-bold text-gray-800">{reportData.conversion_result || '---'}</div>
                 </div>
               </div>

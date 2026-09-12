@@ -153,6 +153,7 @@ export interface ReportData {
   percent_25_result?: string;
   extra_income?: string;
   extra_nights?: string;
+  extra_nights_amount?: string; // USD amount for extra nights
 }
 
 export interface SavedReport {
