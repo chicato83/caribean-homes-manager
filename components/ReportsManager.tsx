@@ -145,21 +145,25 @@ export const ReportsManager: React.FC = () => {
       data.period = periodMatch[0];
     }
 
-    // Extract host name — pattern: "Nombre del anfitrión" followed by name
+    // Extract host name — stop at "ID de usuario", "Fecha", or newline
     const hostPatterns = [
-      /Nombre del anfitri[oó]n\s*\n?\s*(.+)/i,
-      /Nombre del anfitri[oó]n\s*[:\-]?\s*(.+)/i,
-      /host\s+name\s*[:\-]?\s*(.+)/i,
+      /Nombre del anfitri[oó]n\s*[:\n]?\s*([^\nIDFecha]+)/i,
+      /Nombre del anfitri[oó]n\s*\n\s*(.+)/i,
     ];
     for (const p of hostPatterns) {
       const m = text.match(p);
-      if (m) { data.host_name = m[1].trim(); break; }
+      if (m) {
+        let name = m[1].trim();
+        // Clean up: remove trailing labels that leaked in
+        name = name.replace(/\s*ID\s+de\s+usuario.*/i, '').trim();
+        name = name.replace(/\s*Fecha.*/i, '').trim();
+        if (name) { data.host_name = name; break; }
+      }
     }
 
-    // Extract host ID — pattern: "ID de usuario" followed by number
+    // Extract host ID — just the digits after "ID de usuario"
     const idPatterns = [
-      /ID de usuario\s*\n?\s*(\d+)/i,
-      /ID de usuario\s*[:\-]?\s*(\d+)/i,
+      /ID de usuario\s*[:\n]?\s*(\d+)/i,
       /user\s*ID\s*[:\-]?\s*(\d+)/i,
     ];
     for (const p of idPatterns) {
