@@ -87,16 +87,16 @@ const toApartmentRow = (apt: Apartment) => ({
   address: apt.address,
   description: apt.description,
   image_url: apt.imageUrl,
-  price_per_night: Math.round(apt.pricePerNight), // Supabase column is INTEGER
-  bedrooms: apt.bedrooms,
-  bathrooms: apt.bathrooms,
+  price_per_night: Math.round(Number(apt.pricePerNight) || 0),
+  bedrooms: Math.round(Number(apt.bedrooms) || 1),
+  bathrooms: Math.round(Number(apt.bathrooms) || 1),
   amenities: apt.amenities || [],
   wifi_ssid: apt.wifiSSID,
   wifi_password: apt.wifiPassword,
   access_code: apt.accessCode,
   check_in_time: apt.checkInTime,
   check_out_time: apt.checkOutTime,
-  max_guests: apt.maxGuests,
+  max_guests: Math.round(Number(apt.maxGuests) || 2),
   house_rules: apt.houseRules,
   notes: apt.notes,
 });
@@ -183,6 +183,7 @@ export const StorageService = {
   saveApartment: async (apt: Apartment): Promise<Apartment | null> => {
     try {
       const row = toApartmentRow(apt);
+      console.log("saveApartment row:", JSON.stringify(row, null, 2));
 
       if (apt.id && apt.id.length > 10 && !apt.id.startsWith('new_')) {
         const { data, error } = await supabase
