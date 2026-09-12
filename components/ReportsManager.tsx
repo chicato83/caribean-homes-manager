@@ -40,9 +40,60 @@ export const ReportsManager: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [rateLoading, setRateLoading] = useState(false);
+  const [rateSource, setRateSource] = useState<string | null>(null);
+
+  // Auto-fetch Banco Cibao exchange rate from TasaReal API
+  const fetchBancoCibaoRate = async () => {
+    const apiKey = import.meta.env.VITE_TASAREAL_API_KEY;
+    if (!apiKey) {
+      console.warn('VITE_TASAREAL_API_KEY not configured');
+      return;
+    }
+
+    setRateLoading(true);
+    try {
+      const response = await fetch(
+        'https://tasareal.com/api/v1/rates?institution=cibao&currency=USD',
+        {
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      // Get the sell rate (what you pay to buy USD) or buy rate as fallback
+      const cibaoRate = data.rates?.find(
+        (r: any) => r.institution === 'cibao'
+      );
+
+      if (cibaoRate) {
+        const rate = cibaoRate.sell || cibaoRate.buy;
+        if (rate) {
+          setReportData(prev => ({
+            ...prev,
+            tasa_banco_cibao: rate.toString(),
+          }));
+          setRateSource(`TasaReal.com • ${data.date}`);
+          console.log(`Banco Cibao rate loaded: ${rate} DOP/USD`);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching Banco Cibao rate:', err);
+      // Silent fail - user can still enter rate manually
+    }
+    setRateLoading(false);
+  };
 
   useEffect(() => {
     loadData();
+    fetchBancoCibaoRate();
   }, []);
 
   const loadData = async () => {
@@ -474,14 +525,31 @@ export const ReportsManager: React.FC = () => {
               <h3 className="font-bold text-gray-700 border-b pb-2">Conversión</h3>
               <div className="flex gap-4 items-center">
                 <div className="flex-1">
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Tasa Banco Cibao (RD$)</label>
-                  <input
-                    type="number"
-                    value={reportData.tasa_banco_cibao}
-                                      onChange={e => setReportData({ ...reportData, tasa_banco_cibao: e.target.value })}
-                    className="w-full p-2 border rounded-lg border-green-300"
-                    step="0.01"
-                  />
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Tasa Banco Cibao (RD$)</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      value={reportData.tasa_banco_cibao}
+                      onChange={e => setReportData({ ...reportData, tasa_banco_cibao: e.target.value })}
+                      className="flex-1 p-2 border rounded-lg border-green-300"
+                      step="0.01"
+                    />
+                    <button
+                      onClick={fetchBancoCibaoRate}
+                      disabled={rateLoading}
+                      className="px-3 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors disabled:opacity-50"
+                      title="Actualizar tasa desde TasaReal.com"
+                    >
+                      {rateLoading ? (
+                        <span className="animate-spin">⟳</span>
+                      ) : (
+                        <span>🔄</span>
+                      )}
+                    </button>
+                  </div>
+                  {rateSource && (
+                    <p className="text-xs text-green-600 mt-1">✓ {rateSource}</p>
+                  )}
                 </div>
                 <div className="flex-1 bg-gray-50 p-4 rounded-lg">
                   <div className="text-xs text-gray-500">Resultado 25% (RD$)</div>
