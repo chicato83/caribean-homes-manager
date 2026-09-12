@@ -124,6 +124,10 @@ export interface User {
 export interface ReportData {
   period: string;
   reportDate: string;
+  // Host info
+  host_name?: string;
+  host_id?: string;
+  // Financial summary
   summary: {
     ingresos_brutos: string;
     ajustes: string;
@@ -131,9 +135,13 @@ export interface ReportData {
     impuestos_retenidos: string;
     total_usd: string;
   };
+  extra_income?: string; // Manual additional income
+  // Stats
   stats: {
     noches_reservadas: string;
+    noches_promedio?: string;
   };
+  // Accommodations
   accommodations: {
     [key: string]: {
       name: string;
@@ -145,15 +153,19 @@ export interface ReportData {
       total_usd: string;
     };
   };
+  // Payment methods
   payment_methods: {
+    method: string; // e.g. "PayPal", "Transferencia"
+    email?: string;
     amount_usd: string;
   }[];
+  // Conversion
   tasa_banco_cibao: string;
   conversion_result?: string;
   percent_25_result?: string;
-  extra_income?: string;
+  // Extra nights
   extra_nights?: string;
-  extra_nights_amount?: string; // USD amount for extra nights
+  extra_nights_amount?: string;
 }
 
 export interface SavedReport {
