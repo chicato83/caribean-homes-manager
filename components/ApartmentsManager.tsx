@@ -23,19 +23,14 @@ export const ApartmentsManager: React.FC = () => {
   }, []);
 
   const handleSave = async (apt: Apartment) => {
-    console.log("ApartmentsManager.handleSave called with:", { id: apt.id, name: apt.name, editingId, recEditingId });
     if (editingId) {
         // Saving Apartment Details
-        console.log("Calling StorageService.saveApartment...");
-        const result = await StorageService.saveApartment(apt);
-        console.log("saveApartment result:", result);
+        await StorageService.saveApartment(apt);
     } else if (recEditingId) {
         // Saving Recommendations
-        console.log("Calling StorageService.syncRecommendations...");
         await StorageService.syncRecommendations(apt.id, apt.recommendations);
     }
     
-    console.log("Reloading apartments list...");
     await loadApartments();
     setEditingId(null);
     setRecEditingId(null);

@@ -87,7 +87,7 @@ const toApartmentRow = (apt: Apartment) => ({
   address: apt.address,
   description: apt.description,
   image_url: apt.imageUrl,
-  price_per_night: apt.pricePerNight,
+  price_per_night: Math.round(apt.pricePerNight), // Supabase column is INTEGER
   bedrooms: apt.bedrooms,
   bathrooms: apt.bathrooms,
   amenities: apt.amenities || [],
@@ -183,7 +183,6 @@ export const StorageService = {
   saveApartment: async (apt: Apartment): Promise<Apartment | null> => {
     try {
       const row = toApartmentRow(apt);
-      console.log("StorageService.saveApartment input:", { id: apt.id, row });
 
       if (apt.id && apt.id.length > 10 && !apt.id.startsWith('new_')) {
         const { data, error } = await supabase
@@ -193,11 +192,7 @@ export const StorageService = {
           .select()
           .single();
 
-        if (error) {
-          console.error("Supabase update error:", error);
-          throw error;
-        }
-        console.log("Supabase update success:", data);
+        if (error) throw error;
         return { ...apt, id: data.id };
       } else {
         const { data, error } = await supabase
@@ -206,11 +201,7 @@ export const StorageService = {
           .select()
           .single();
 
-        if (error) {
-          console.error("Supabase insert error:", error);
-          throw error;
-        }
-        console.log("Supabase insert success:", data);
+        if (error) throw error;
         return { ...apt, id: data.id };
       }
     } catch (error) {
