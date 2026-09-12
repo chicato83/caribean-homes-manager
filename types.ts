@@ -124,6 +124,9 @@ export interface User {
 export interface ReportData {
   period: string;
   reportDate: string;
+  // Host info
+  host_name?: string;
+  host_id?: string;
   summary: {
     ingresos_brutos: string;
     ajustes: string;
@@ -146,6 +149,7 @@ export interface ReportData {
     };
   };
   payment_methods: {
+    method: string;
     amount_usd: string;
   }[];
   tasa_banco_cibao: string;
@@ -153,7 +157,7 @@ export interface ReportData {
   percent_25_result?: string;
   extra_income?: string;
   extra_nights?: string;
-  extra_nights_amount?: string; // USD amount for extra nights
+  extra_nights_amount?: string;
 }
 
 export interface SavedReport {

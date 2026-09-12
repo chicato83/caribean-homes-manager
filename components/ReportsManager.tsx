@@ -125,7 +125,7 @@ export const ReportsManager: React.FC = () => {
 
       console.log('PDF full text:', fullText); // Debug: see what text we extract
 
-      const parsedData = parseAirbnbReport(fullText, selectedApartment.name);
+      const parsedData = parseAirbnbReport(fullText, selectedApartment);
       setReportData(parsedData);
       setStep('preview');
     } catch (err) {
@@ -135,7 +135,7 @@ export const ReportsManager: React.FC = () => {
     setUploading(false);
   };
 
-  const parseAirbnbReport = (text: string, apartmentName: string): ReportData => {
+  const parseAirbnbReport = (text: string, apartment: Apartment): ReportData => {
     const data: ReportData = { ...INITIAL_REPORT_DATA };
 
     // Extract period - try multiple formats
@@ -145,8 +145,29 @@ export const ReportsManager: React.FC = () => {
       data.period = periodMatch[0];
     }
 
+    // Extract host name — pattern: "Nombre del anfitrión" followed by name
+    const hostPatterns = [
+      /Nombre del anfitri[oó]n\s*\n?\s*(.+)/i,
+      /Nombre del anfitri[oó]n\s*[:\-]?\s*(.+)/i,
+      /host\s+name\s*[:\-]?\s*(.+)/i,
+    ];
+    for (const p of hostPatterns) {
+      const m = text.match(p);
+      if (m) { data.host_name = m[1].trim(); break; }
+    }
+
+    // Extract host ID — pattern: "ID de usuario" followed by number
+    const idPatterns = [
+      /ID de usuario\s*\n?\s*(\d+)/i,
+      /ID de usuario\s*[:\-]?\s*(\d+)/i,
+      /user\s*ID\s*[:\-]?\s*(\d+)/i,
+    ];
+    for (const p of idPatterns) {
+      const m = text.match(p);
+      if (m) { data.host_id = m[1]; break; }
+    }
+
     // Extract nights reserved - try multiple patterns
-    // Pattern 1: "Noches reservadas: X" or "X noches reservadas"
     const nightsPatterns = [
       /noches?\s+reservadas?\s*[:=]?\s*(\d+)/i,
       /(\d+)\s+noches?\s+reservadas?/i,
@@ -154,16 +175,16 @@ export const ReportsManager: React.FC = () => {
       /(\d+)\s+reserved?\s+nights?/i,
       /night(?:s)?\s+(?:booked|reserved)\s*[:=]?\s*(\d+)/i,
       /(\d+)\s+night(?:s)?\s+(?:booked|reserved)/i,
-      // Airbnb specific: often appears as "Noche(s)" with number nearby
       /noche\s*\(?s?\)?\s*[:=]?\s*(\d+)/i,
       /(\d+)\s*noche\s*\(?s?\)?/i,
+      // Airbnb total nights: "X Noches totales"
+      /(\d+)\s+Noches?\s*totales?/i,
     ];
 
     for (const pattern of nightsPatterns) {
       const match = text.match(pattern);
       if (match) {
         data.stats.noches_reservadas = match[1];
-        console.log('Nights matched:', match[1], 'with pattern:', pattern.source);
         break;
       }
     }
@@ -171,8 +192,6 @@ export const ReportsManager: React.FC = () => {
     // Extract amounts (USD) - handle various formats
     const amounts = text.match(/\$[\d,]+\.?\d*/g) || [];
     const numbers = amounts.map(a => parseFloat(a.replace(/[$,]/g, '')));
-
-    console.log('Extracted amounts:', numbers); // Debug
 
     // Typical Airbnb report structure
     if (numbers.length >= 4) {
@@ -183,9 +202,22 @@ export const ReportsManager: React.FC = () => {
       data.summary.total_usd = numbers[4]?.toFixed(2) || numbers[0].toFixed(2);
     }
 
+    // Extract extra income
+    const extraIncomeMatch = text.match(/Ingresos Adicionales.*?\+?\$?([\d,.]+)/i);
+    if (extraIncomeMatch) data.extra_nights_amount = extraIncomeMatch[1].replace(/,/g, '');
+
+    // Extract payment methods
+    const paypalMatch = text.match(/PayPal.*?\(USD\)\s*\$?([\d,.]+)/i);
+    if (paypalMatch) {
+      data.payment_methods = [{
+        method: 'PayPal',
+        amount_usd: paypalMatch[1].replace(/,/g, ''),
+      }];
+    }
+
     // Add accommodation entry
-    data.accommodations[apartmentName] = {
-      name: apartmentName,
+    data.accommodations[apartment.name] = {
+      name: apartment.name,
       avg_nights: data.stats.noches_reservadas,
       ingresos_brutos: data.summary.ingresos_brutos,
       ajustes: data.summary.ajustes,
@@ -421,29 +453,29 @@ export const ReportsManager: React.FC = () => {
       <div className="mb-6">
         <h3 className="text-sm font-bold text-gray-500 uppercase mb-3">Resumen</h3>
         <div className="grid grid-cols-2 gap-2">
-          <div className="flex justify-between p-2 bg-gray-50 rounded">
+          <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
             <span className="text-gray-600 text-sm">Ingresos brutos</span>
             <span className="font-semibold text-sm">{formatCurrency(reportData.summary.ingresos_brutos)}</span>
           </div>
-          <div className="flex justify-between p-2 bg-gray-50 rounded">
+          <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
             <span className="text-gray-600 text-sm">Ajustes</span>
             <span className="font-semibold text-sm">{formatCurrency(reportData.summary.ajustes)}</span>
           </div>
+          <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
+            <span className="text-gray-600 text-sm">Tarifas de servicio</span>
+            <span className="font-semibold text-sm">{formatCurrency(reportData.summary.tarifas_servicio)}</span>
+          </div>
+          <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
+            <span className="text-gray-600 text-sm">Impuestos retenidos</span>
+            <span className="font-semibold text-sm">{formatCurrency(reportData.summary.impuestos_retenidos)}</span>
+          </div>
           {extraIncome > 0 && (
-            <div className="flex justify-between p-2 bg-green-50 rounded">
+            <div className="flex justify-between items-center p-3 bg-green-50 border border-green-200 rounded">
               <span className="text-green-700 text-sm">Ingresos Adicionales (Manual)</span>
               <span className="font-semibold text-green-700 text-sm">+{formatCurrency(extraIncome.toString())}</span>
             </div>
           )}
-          <div className="flex justify-between p-2 bg-gray-50 rounded">
-            <span className="text-gray-600 text-sm">Tarifas de servicio</span>
-            <span className="font-semibold text-sm">{formatCurrency(reportData.summary.tarifas_servicio)}</span>
-          </div>
-          <div className="flex justify-between p-2 bg-gray-50 rounded">
-            <span className="text-gray-600 text-sm">Impuestos retenidos</span>
-            <span className="font-semibold text-sm">{formatCurrency(reportData.summary.impuestos_retenidos)}</span>
-          </div>
-          <div className="flex justify-between p-3 bg-green-50 border border-green-200 rounded">
+          <div className={`flex justify-between items-center p-3 rounded ${extraIncome > 0 ? 'bg-green-50 border border-green-200' : 'bg-gray-50'}`}>
             <span className="font-bold text-gray-800">Total (USD)</span>
             <span className="font-bold text-green-600 text-lg">{formatCurrency(summaryTotal.toString())}</span>
           </div>
@@ -454,18 +486,18 @@ export const ReportsManager: React.FC = () => {
       <div className="mb-6">
         <h3 className="text-sm font-bold text-gray-500 uppercase mb-3">Estadísticas</h3>
         <div className="grid grid-cols-3 gap-2">
-          <div className="flex justify-between p-2 bg-gray-50 rounded">
+          <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
             <span className="text-gray-600 text-sm">Noches totales</span>
             <span className="font-semibold text-sm">{reportData.stats.noches_reservadas || '0'}</span>
           </div>
           {reportData.extra_nights && (
-            <div className="flex justify-between p-2 bg-gray-50 rounded">
+            <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
               <span className="text-gray-600 text-sm">Noches Extra</span>
               <span className="font-semibold text-sm">{reportData.extra_nights}</span>
             </div>
           )}
           {extraIncome > 0 && (
-            <div className="flex justify-between p-2 bg-gray-50 rounded">
+            <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
               <span className="text-gray-600 text-sm">Ingresos Adicionales</span>
               <span className="font-semibold text-sm">{formatCurrency(extraIncome.toString())}</span>
             </div>
@@ -515,7 +547,7 @@ export const ReportsManager: React.FC = () => {
         <div className="mb-6">
           <h3 className="text-sm font-bold text-gray-500 uppercase mb-3">Formas de cobro</h3>
           {reportData.payment_methods.map((pm, i) => (
-            <div key={i} className="flex justify-between p-2 bg-gray-50 rounded mb-1">
+            <div key={i} className="flex justify-between items-center p-3 bg-gray-50 rounded mb-1">
               <span className="text-gray-600 text-sm">{pm.method} (USD)</span>
               <span className="font-semibold text-sm">{formatCurrency(pm.amount_usd)}</span>
             </div>
@@ -526,28 +558,28 @@ export const ReportsManager: React.FC = () => {
       {/* Liquidación y Pago */}
       <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
         <h3 className="text-sm font-bold text-gray-700 mb-3">Liquidación y Pago</h3>
-        <div className="space-y-2">
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-600">Total Airbnb (USD)</span>
-            <span className="font-medium">{formatCurrency(summaryTotal.toString())}</span>
+        <div className="grid grid-cols-2 gap-2">
+          <div className="flex justify-between items-center p-3 bg-white/60 rounded">
+            <span className="text-gray-600 text-sm">Total Airbnb (USD)</span>
+            <span className="font-semibold text-sm">{formatCurrency(summaryTotal.toString())}</span>
           </div>
           {extraIncome > 0 && (
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">+ Ingresos adicionales</span>
-              <span className="font-medium text-green-700">+{formatCurrency(extraIncome.toString())}</span>
+            <div className="flex justify-between items-center p-3 bg-white/60 rounded">
+              <span className="text-gray-600 text-sm">+ Ingresos adicionales</span>
+              <span className="font-semibold text-green-700 text-sm">+{formatCurrency(extraIncome.toString())}</span>
             </div>
           )}
-          <div className="flex justify-between text-sm border-t border-green-300 pt-2">
+          <div className="flex justify-between items-center p-3 bg-green-100 border border-green-300 rounded">
             <span className="font-bold text-gray-800">Total (USD)</span>
             <span className="font-bold text-green-600 text-lg">{formatCurrency(grandTotal.toString())}</span>
           </div>
-          <div className="flex justify-between text-sm border-t border-green-300 pt-2">
-            <span className="text-red-600">- Cobro transferencia</span>
-            <span className="font-medium text-red-600">-$28.00</span>
+          <div className="flex justify-between items-center p-3 bg-red-50 border border-red-200 rounded">
+            <span className="text-red-600 text-sm">- Cobro transferencia</span>
+            <span className="font-semibold text-red-600 text-sm">-$28.00</span>
           </div>
-          <div className="flex justify-between text-sm border-t border-green-300 pt-2">
+          <div className="flex justify-between items-center p-3 col-span-2 bg-green-100 border border-green-300 rounded">
             <span className="font-bold text-gray-800">Base (Total - $28)</span>
-            <span className="font-bold">{formatCurrency((grandTotal - 28).toString())}</span>
+            <span className="font-bold text-green-700 text-lg">{formatCurrency((grandTotal - 28).toString())}</span>
           </div>
         </div>
       </div>
