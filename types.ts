@@ -118,3 +118,48 @@ export interface User {
   pin: string; // Simple auth for demo
   roleId: string;
 }
+
+// -- Reports System Types --
+
+export interface ReportData {
+  period: string;
+  reportDate: string;
+  summary: {
+    ingresos_brutos: string;
+    ajustes: string;
+    tarifas_servicio: string;
+    impuestos_retenidos: string;
+    total_usd: string;
+  };
+  stats: {
+    noches_reservadas: string;
+  };
+  accommodations: {
+    [key: string]: {
+      name: string;
+      avg_nights: string;
+      ingresos_brutos: string;
+      ajustes: string;
+      tarifas_servicio: string;
+      impuestos_retenidos: string;
+      total_usd: string;
+    };
+  };
+  payment_methods: {
+    amount_usd: string;
+  }[];
+  tasa_banreservas: string;
+  conversion_result?: string;
+  percent_25_result?: string;
+  extra_income?: string;
+  extra_nights?: string;
+}
+
+export interface SavedReport {
+  id: string;
+  apartmentId: string;
+  apartmentName: string;
+  period: string;
+  generatedAt: string;
+  reportData: ReportData;
+}

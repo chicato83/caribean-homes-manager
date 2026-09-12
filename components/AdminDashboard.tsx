@@ -1,12 +1,13 @@
 
 import React, { useState } from 'react';
-import { LayoutDashboard, Home, ClipboardCheck, Wrench, Package, LogOut, Settings, Globe } from 'lucide-react';
+import { LayoutDashboard, Home, ClipboardCheck, Wrench, Package, LogOut, Settings, Globe, FileText } from 'lucide-react';
 import { ApartmentsManager } from './ApartmentsManager';
 import { CleaningManager } from './CleaningManager';
 import { MaintenanceManager } from './MaintenanceManager';
 import { InventoryManager } from './InventoryManager';
 import { SettingsManager } from './SettingsManager';
 import { GlobalRecommendationsManager } from './GlobalRecommendationsManager';
+import { ReportsManager } from './ReportsManager';
 import { User, Role } from '../types';
 
 interface AdminDashboardProps {
@@ -15,7 +16,7 @@ interface AdminDashboardProps {
   onLogout: () => void;
 }
 
-type Tab = 'overview' | 'apartments' | 'recommendations' | 'cleaning' | 'maintenance' | 'inventory' | 'settings';
+type Tab = 'overview' | 'apartments' | 'recommendations' | 'cleaning' | 'maintenance' | 'inventory' | 'settings' | 'reports';
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, role, onLogout }) => {
   // Default to first available tab based on permission, or 'apartments' fallback
@@ -41,6 +42,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, role, onLo
             <>
                 <NavButton icon={<Home />} label="Apartamentos" active={activeTab === 'apartments'} onClick={() => setActiveTab('apartments')} />
                 <NavButton icon={<Globe />} label="Recomendaciones" active={activeTab === 'recommendations'} onClick={() => setActiveTab('recommendations')} />
+                <NavButton icon={<FileText />} label="Informes" active={activeTab === 'reports'} onClick={() => setActiveTab('reports')} />
             </>
           )}
           {(hasPerm('manage_cleaning') || hasPerm('perform_cleaning')) && (
@@ -82,6 +84,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, role, onLo
                     className={`p-2 rounded-lg transition-colors flex-shrink-0 ${activeTab === 'recommendations' ? 'bg-brand-600 text-white' : 'text-slate-400 hover:text-white'}`}
                     >
                     <Globe className="w-5 h-5" />
+                    </button>
+                    <button 
+                    onClick={() => setActiveTab('reports')} 
+                    className={`p-2 rounded-lg transition-colors flex-shrink-0 ${activeTab === 'reports' ? 'bg-brand-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                    >
+                    <FileText className="w-5 h-5" />
                     </button>
                 </>
             )}
@@ -131,6 +139,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, role, onLo
       <main className="flex-1 overflow-y-auto p-4 md:p-8 mt-16 md:mt-0">
         {activeTab === 'apartments' && hasPerm('manage_apartments') && <ApartmentsManager />}
         {activeTab === 'recommendations' && hasPerm('manage_apartments') && <GlobalRecommendationsManager />}
+        {activeTab === 'reports' && hasPerm('manage_apartments') && <ReportsManager />}
         {activeTab === 'cleaning' && (hasPerm('manage_cleaning') || hasPerm('perform_cleaning')) && <CleaningManager role={role} />}
         {activeTab === 'maintenance' && hasPerm('manage_maintenance') && <MaintenanceManager />}
         {activeTab === 'inventory' && hasPerm('manage_inventory') && <InventoryManager />}

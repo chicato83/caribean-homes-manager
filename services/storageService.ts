@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { Apartment, CleaningLog, InventoryItem, MaintenanceItem, CleaningTemplate, User, Role, Recommendation, InventoryStatus } from '../types';
+import { Apartment, CleaningLog, InventoryItem, MaintenanceItem, CleaningTemplate, User, Role, Recommendation, InventoryStatus, SavedReport, ReportData } from '../types';
 
 // --- Helper: Map Supabase snake_case rows to app camelCase objects ---
 
@@ -546,6 +546,121 @@ export const StorageService = {
       if (error) throw error;
     } catch (e) {
       console.error("Delete User Error", e);
+    }
+  },
+
+  // --- REPORTS ---
+
+  getReports: async (): Promise<SavedReport[]> => {
+    try {
+      const { data, error } = await supabase
+        .from('reports')
+        .select('*')
+        .order('generated_at', { ascending: false });
+
+      if (error) throw error;
+      return (data || []).map((r: any) => ({
+        id: r.id,
+        apartmentId: r.apartment_id,
+        apartmentName: r.apartment_name,
+        period: r.period,
+        generatedAt: r.generated_at,
+        reportData: r.report_data,
+      }));
+    } catch (error: any) {
+      console.error("Error fetching reports:", error);
+      // If table doesn't exist, return localStorage fallback
+      if (error.code === '42P01' || error.message?.includes('does not exist')) {
+        console.warn("Reports table not found, using localStorage fallback");
+        try {
+          const stored = localStorage.getItem('caribean_reports');
+          return stored ? JSON.parse(stored) : [];
+        } catch {
+          return [];
+        }
+      }
+      return [];
+    }
+  },
+
+  saveReport: async (report: SavedReport): Promise<void> => {
+    try {
+      const row = {
+        apartment_id: report.apartmentId,
+        apartment_name: report.apartmentName,
+        period: report.period,
+        generated_at: report.generatedAt,
+        report_data: report.reportData,
+      };
+
+      // Try Supabase first
+      const { error } = await supabase
+        .from('reports')
+        .upsert(row, { onConflict: 'id' });
+
+      if (error) throw error;
+
+      // Also save to localStorage as backup
+      try {
+        const existing = JSON.parse(localStorage.getItem('caribean_reports') || '[]');
+        const idx = existing.findIndex((r: SavedReport) => r.id === report.id);
+        if (idx >= 0) {
+          existing[idx] = report;
+        } else {
+          existing.unshift(report);
+        }
+        localStorage.setItem('caribean_reports', JSON.stringify(existing));
+      } catch {
+        // localStorage backup is optional
+      }
+    } catch (error: any) {
+      console.error("Error saving report to Supabase:", error);
+      // Fallback to localStorage if table doesn't exist
+      if (error.code === '42P01' || error.message?.includes('does not exist')) {
+        console.warn("Reports table not found, saving to localStorage only");
+        try {
+          const existing = JSON.parse(localStorage.getItem('caribean_reports') || '[]');
+          const idx = existing.findIndex((r: SavedReport) => r.id === report.id);
+          if (idx >= 0) {
+            existing[idx] = report;
+          } else {
+            existing.unshift(report);
+          }
+          localStorage.setItem('caribean_reports', JSON.stringify(existing));
+        } catch (e) {
+          console.error("localStorage save failed:", e);
+        }
+      }
+    }
+  },
+
+  deleteReport: async (id: string): Promise<void> => {
+    try {
+      const { error } = await supabase
+        .from('reports')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      // Also remove from localStorage
+      try {
+        const existing = JSON.parse(localStorage.getItem('caribean_reports') || '[]');
+        localStorage.setItem('caribean_reports', JSON.stringify(existing.filter((r: SavedReport) => r.id !== id)));
+      } catch {
+        // localStorage cleanup is optional
+      }
+    } catch (error: any) {
+      console.error("Error deleting report:", error);
+      // Fallback to localStorage
+      if (error.code === '42P01' || error.message?.includes('does not exist')) {
+        try {
+          const existing = JSON.parse(localStorage.getItem('caribean_reports') || '[]');
+          localStorage.setItem('caribean_reports', JSON.stringify(existing.filter((r: SavedReport) => r.id !== id)));
+        } catch (e) {
+          console.error("localStorage delete failed:", e);
+        }
+      }
     }
   },
 };
