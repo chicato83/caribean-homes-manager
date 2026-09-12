@@ -24,7 +24,7 @@ const INITIAL_REPORT_DATA: ReportData = {
   },
   accommodations: {},
   payment_methods: [],
-  tasa_banreservas: '58.00',
+  tasa_banco_cibao: '58.00',
   conversion_result: '',
   percent_25_result: '',
   extra_income: '',
@@ -133,7 +133,7 @@ export const ReportsManager: React.FC = () => {
     data.percent_25_result = (total * 0.25).toFixed(2);
 
     // Calculate conversion
-    const tasa = parseFloat(data.tasa_banreservas) || 58;
+    const tasa = parseFloat(data.tasa_banco_cibao) || 58;
     data.conversion_result = (total * tasa).toFixed(2);
 
     return data;
@@ -141,7 +141,7 @@ export const ReportsManager: React.FC = () => {
 
   const calculateConversions = () => {
     const total = parseFloat(reportData.summary.total_usd) || 0;
-    const tasa = parseFloat(reportData.tasa_banreservas) || 58;
+    const tasa = parseFloat(reportData.tasa_banco_cibao) || 58;
     const percent25 = total * 0.25;
 
     setReportData({
@@ -153,7 +153,7 @@ export const ReportsManager: React.FC = () => {
 
   useEffect(() => {
     calculateConversions();
-  }, [reportData.summary.total_usd, reportData.tasa_banreservas]);
+  }, [reportData.summary.total_usd, reportData.tasa_banco_cibao]);
 
   const handleSave = async () => {
     const newReport: SavedReport = {
@@ -474,11 +474,11 @@ export const ReportsManager: React.FC = () => {
               <h3 className="font-bold text-gray-700 border-b pb-2">Conversión</h3>
               <div className="flex gap-4 items-center">
                 <div className="flex-1">
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Tasa Banreservas (RD$)</label>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Tasa Banco Cibao (RD$)</label>
                   <input
                     type="number"
-                    value={reportData.tasa_banreservas}
-                    onChange={e => setReportData({ ...reportData, tasa_banreservas: e.target.value })}
+                    value={reportData.tasa_banco_cibao}
+                                      onChange={e => setReportData({ ...reportData, tasa_banco_cibao: e.target.value })}
                     className="w-full p-2 border rounded-lg border-green-300"
                     step="0.01"
                   />

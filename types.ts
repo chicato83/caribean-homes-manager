@@ -148,7 +148,7 @@ export interface ReportData {
   payment_methods: {
     amount_usd: string;
   }[];
-  tasa_banreservas: string;
+  tasa_banco_cibao: string;
   conversion_result?: string;
   percent_25_result?: string;
   extra_income?: string;
