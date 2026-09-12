@@ -358,6 +358,7 @@ export const ReportsManager: React.FC = () => {
       image: { type: 'jpeg' as const, quality: 0.98 },
       html2canvas: { scale: 2, useCORS: true },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' as const },
+      pagebreak: { mode: ['css', 'legacy'], before: ['.liquidacion-section'] },
     };
 
     await html2pdf().set(options).from(content).save();
@@ -524,8 +525,8 @@ export const ReportsManager: React.FC = () => {
         </div>
       )}
 
-      {/* Liquidación y Pago */}
-      <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+      {/* Liquidación y Pago — page 2 */}
+      <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg liquidacion-section" style={{ pageBreakBefore: 'always' }}>
         <h3 className="text-sm font-bold text-gray-700 mb-3">Liquidación y Pago</h3>
         <div className="grid grid-cols-2 gap-2">
           <div className="flex justify-between items-center p-3 bg-white/60 rounded">
