@@ -207,8 +207,8 @@ export const ReportsManager: React.FC = () => {
 
   const calculateConversions = () => {
     const summaryTotal = parseFloat(reportData.summary.total_usd) || 0;
-    const extraIncome = parseFloat(reportData.extra_income) || 0;
-    const total = summaryTotal + extraIncome;
+    const extraNights = parseFloat(reportData.extra_nights_amount) || 0;
+    const total = summaryTotal + extraNights;
     const tasa = parseFloat(reportData.tasa_banco_cibao) || 58;
     // Restar $28 fijos y luego calcular 25%
     const base = total - 28;
@@ -223,7 +223,7 @@ export const ReportsManager: React.FC = () => {
 
   useEffect(() => {
     calculateConversions();
-  }, [reportData.summary.total_usd, reportData.summary.ingresos_brutos, reportData.summary.ajustes, reportData.summary.tarifas_servicio, reportData.summary.impuestos_retenidos, reportData.extra_income, reportData.tasa_banco_cibao]);
+  }, [reportData.summary.total_usd, reportData.summary.ingresos_brutos, reportData.summary.ajustes, reportData.summary.tarifas_servicio, reportData.summary.impuestos_retenidos, reportData.extra_nights_amount, reportData.tasa_banco_cibao]);
 
   const handleSave = async () => {
     const report: SavedReport = {
@@ -373,14 +373,48 @@ export const ReportsManager: React.FC = () => {
   };
 
   // Report content component (reused in preview, view, and print)
-  const ReportContent = () => (
+  const ReportContent = () => {
+    const summaryTotal = parseFloat(reportData.summary.total_usd) || 0;
+    const extraIncome = parseFloat(reportData.extra_nights_amount) || 0;
+    const grandTotal = summaryTotal + extraIncome;
+
+    return (
     <div>
-      {/* Header */}
-      <div className="border-b-4 border-brand-600 pb-4 mb-6">
-        <h1 className="text-xl font-bold text-gray-800">
+      {/* Header with logos */}
+      <div className="flex items-center justify-between border-b-4 border-brand-600 pb-4 mb-6">
+        <div className="flex items-center gap-4">
+          <img src={AIRBNB_LOGO} alt="Airbnb" className="h-10" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+          <div className="w-px h-10 bg-gray-300"></div>
+          <img src={CARIBEAN_LOGO} alt="CaribeanHomes" className="h-10" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+        </div>
+        <div className="text-right">
+          <h1 className="text-xl font-bold text-brand-600">Caribean<span className="text-gray-800">Homes</span></h1>
+          <p className="text-xs text-gray-500">Property Management Report</p>
+        </div>
+      </div>
+
+      {/* Title */}
+      <div className="text-center mb-6">
+        <h2 className="text-lg font-bold text-gray-800">
           Informe de ingresos — {viewingReport?.apartmentName || selectedApartment?.name || ''} - {reportData.period}
-        </h1>
-        <p className="text-sm text-gray-500 mt-1">Caribean Home Management - {viewingReport?.apartmentName || selectedApartment?.name || ''}</p>
+        </h2>
+        <p className="text-sm text-gray-500">Caribean Home Management - {viewingReport?.apartmentName || selectedApartment?.name || ''}</p>
+      </div>
+
+      {/* Info del anfitrión */}
+      <div className="grid grid-cols-3 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
+        <div>
+          <p className="text-xs text-gray-500 uppercase">Nombre del anfitrión</p>
+          <p className="font-semibold text-gray-800">{reportData.host_name || '—'}</p>
+        </div>
+        <div>
+          <p className="text-xs text-gray-500 uppercase">ID de usuario</p>
+          <p className="font-semibold text-gray-800">{reportData.host_id || '—'}</p>
+        </div>
+        <div>
+          <p className="text-xs text-gray-500 uppercase">Fecha del informe</p>
+          <p className="font-semibold text-gray-800">{reportData.reportDate}</p>
+        </div>
       </div>
 
       {/* Resumen */}
@@ -395,10 +429,10 @@ export const ReportsManager: React.FC = () => {
             <span className="text-gray-600 text-sm">Ajustes</span>
             <span className="font-semibold text-sm">{formatCurrency(reportData.summary.ajustes)}</span>
           </div>
-          {reportData.extra_income && (
+          {extraIncome > 0 && (
             <div className="flex justify-between p-2 bg-green-50 rounded">
               <span className="text-green-700 text-sm">Ingresos Adicionales (Manual)</span>
-              <span className="font-semibold text-green-700 text-sm">+{formatCurrency(reportData.extra_income)}</span>
+              <span className="font-semibold text-green-700 text-sm">+{formatCurrency(extraIncome.toString())}</span>
             </div>
           )}
           <div className="flex justify-between p-2 bg-gray-50 rounded">
@@ -411,7 +445,7 @@ export const ReportsManager: React.FC = () => {
           </div>
           <div className="flex justify-between p-3 bg-green-50 border border-green-200 rounded">
             <span className="font-bold text-gray-800">Total (USD)</span>
-            <span className="font-bold text-green-600 text-lg">{formatCurrency(reportData.summary.total_usd)}</span>
+            <span className="font-bold text-green-600 text-lg">{formatCurrency(summaryTotal.toString())}</span>
           </div>
         </div>
       </div>
@@ -430,10 +464,10 @@ export const ReportsManager: React.FC = () => {
               <span className="font-semibold text-sm">{reportData.extra_nights}</span>
             </div>
           )}
-          {reportData.extra_nights_amount && (
+          {extraIncome > 0 && (
             <div className="flex justify-between p-2 bg-gray-50 rounded">
-              <span className="text-gray-600 text-sm">Noches Extra (USD)</span>
-              <span className="font-semibold text-sm">{formatCurrency(reportData.extra_nights_amount)}</span>
+              <span className="text-gray-600 text-sm">Ingresos Adicionales</span>
+              <span className="font-semibold text-sm">{formatCurrency(extraIncome.toString())}</span>
             </div>
           )}
         </div>
@@ -470,7 +504,7 @@ export const ReportsManager: React.FC = () => {
               <td className="text-right py-2">{formatCurrency(reportData.summary.ajustes)}</td>
               <td className="text-right py-2">{formatCurrency(reportData.summary.tarifas_servicio)}</td>
               <td className="text-right py-2">{formatCurrency(reportData.summary.impuestos_retenidos)}</td>
-              <td className="text-right py-2">{formatCurrency(reportData.summary.total_usd)}</td>
+              <td className="text-right py-2">{formatCurrency(summaryTotal.toString())}</td>
             </tr>
           </tbody>
         </table>
@@ -491,10 +525,30 @@ export const ReportsManager: React.FC = () => {
 
       {/* Liquidación y Pago */}
       <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-        <h3 className="text-sm font-bold text-gray-700 mb-2">Liquidación y Pago</h3>
-        <div className="flex justify-between">
-          <span className="font-bold text-gray-800">Total (USD)</span>
-          <span className="font-bold text-green-600 text-lg">{formatCurrency(reportData.summary.total_usd)}</span>
+        <h3 className="text-sm font-bold text-gray-700 mb-3">Liquidación y Pago</h3>
+        <div className="space-y-2">
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-600">Total Airbnb (USD)</span>
+            <span className="font-medium">{formatCurrency(summaryTotal.toString())}</span>
+          </div>
+          {extraIncome > 0 && (
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">+ Ingresos adicionales</span>
+              <span className="font-medium text-green-700">+{formatCurrency(extraIncome.toString())}</span>
+            </div>
+          )}
+          <div className="flex justify-between text-sm border-t border-green-300 pt-2">
+            <span className="font-bold text-gray-800">Total (USD)</span>
+            <span className="font-bold text-green-600 text-lg">{formatCurrency(grandTotal.toString())}</span>
+          </div>
+          <div className="flex justify-between text-sm border-t border-green-300 pt-2">
+            <span className="text-red-600">- Cobro transferencia</span>
+            <span className="font-medium text-red-600">-$28.00</span>
+          </div>
+          <div className="flex justify-between text-sm border-t border-green-300 pt-2">
+            <span className="font-bold text-gray-800">Base (Total - $28)</span>
+            <span className="font-bold">{formatCurrency((grandTotal - 28).toString())}</span>
+          </div>
         </div>
       </div>
 
@@ -507,17 +561,18 @@ export const ReportsManager: React.FC = () => {
             <p className="text-lg font-bold text-gray-800">RD$ {reportData.tasa_banco_cibao}</p>
           </div>
           <div>
-            <p className="text-xs text-gray-500 uppercase">Base (Total - $28)</p>
-            <p className="text-lg font-bold text-gray-800">{formatCurrency((parseFloat(reportData.summary.total_usd) - 28).toString())}</p>
+            <p className="text-xs text-gray-500 uppercase">25% de base en RD$</p>
+            <p className="text-lg font-bold text-blue-600">{reportData.percent_25_result ? formatCurrency(reportData.percent_25_result) : '---'}</p>
           </div>
           <div>
-            <p className="text-xs text-gray-500 uppercase">25% de (Total - $28) en RD$</p>
-            <p className="text-lg font-bold text-blue-600">{reportData.conversion_result ? `RD$ ${reportData.conversion_result}` : '---'}</p>
+            <p className="text-xs text-gray-500 uppercase">A Pagar (RD$)</p>
+            <p className="text-xl font-bold text-blue-700">{reportData.conversion_result ? `RD$ ${parseFloat(reportData.conversion_result).toLocaleString('es-DO', { minimumFractionDigits: 2 })}` : '---'}</p>
           </div>
         </div>
       </div>
     </div>
-  );
+    );
+  };
 
   if (loading) {
     return (
@@ -714,10 +769,6 @@ export const ReportsManager: React.FC = () => {
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Impuestos Retenidos</label>
                   <input type="number" value={reportData.summary.impuestos_retenidos} onChange={e => setReportData({ ...reportData, summary: { ...reportData.summary, impuestos_retenidos: e.target.value } })} className="w-full p-2 border rounded-lg bg-red-50 border-red-200" step="0.01" />
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Ingresos Adicionales</label>
-                  <input type="number" value={reportData.extra_income} onChange={e => setReportData({ ...reportData, extra_income: e.target.value })} className="w-full p-2 border rounded-lg bg-green-50 border-green-200" step="0.01" placeholder="0.00" />
-                </div>
               </div>
               <div className="bg-gray-100 p-3 rounded-lg">
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Total USD</label>
@@ -737,7 +788,7 @@ export const ReportsManager: React.FC = () => {
                   <input type="number" value={reportData.extra_nights} onChange={e => setReportData({ ...reportData, extra_nights: e.target.value })} className="w-full p-2 border rounded-lg bg-blue-50 border-blue-200" placeholder="0" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Noches Extra (USD)</label>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Ingresos Adicionales</label>
                   <input type="number" value={reportData.extra_nights_amount} onChange={e => setReportData({ ...reportData, extra_nights_amount: e.target.value })} className="w-full p-2 border rounded-lg bg-green-50 border-green-200" step="0.01" placeholder="0.00" />
                 </div>
               </div>
@@ -749,25 +800,25 @@ export const ReportsManager: React.FC = () => {
               <div className="bg-gray-50 p-3 rounded-lg space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Ingresos brutos:</span>
-                  <span className="font-medium">{formatCurrency(reportData.summary.ingresos_brutos)}</span>
+                  <span className="font-medium">{formatCurrency(reportData.summary.total_usd)}</span>
                 </div>
-                {reportData.extra_income && parseFloat(reportData.extra_income) > 0 && (
+                {reportData.extra_nights_amount && parseFloat(reportData.extra_nights_amount) > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-green-700">+ Ingresos adicionales:</span>
-                    <span className="font-medium text-green-700">+{formatCurrency(reportData.extra_income)}</span>
+                    <span className="font-medium text-green-700">+{formatCurrency(reportData.extra_nights_amount)}</span>
                   </div>
                 )}
                 <div className="flex justify-between text-sm border-t border-gray-200 pt-2">
                   <span className="text-gray-600">Total ingresos:</span>
-                  <span className="font-bold">{formatCurrency(((parseFloat(reportData.summary.total_usd) || 0) + (parseFloat(reportData.extra_income) || 0)).toString())}</span>
+                  <span className="font-bold">{formatCurrency(((parseFloat(reportData.summary.total_usd) || 0) + (parseFloat(reportData.extra_nights_amount) || 0)).toString())}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-red-600">- Costo fijo:</span>
+                  <span className="text-red-600">- Cobro transferencia:</span>
                   <span className="font-medium text-red-600">-$28.00</span>
                 </div>
                 <div className="flex justify-between text-sm border-t border-gray-200 pt-2">
                   <span className="text-gray-600">Base (Total - $28):</span>
-                  <span className="font-bold">{formatCurrency((((parseFloat(reportData.summary.total_usd) || 0) + (parseFloat(reportData.extra_income) || 0)) - 28).toString())}</span>
+                  <span className="font-bold">{formatCurrency((((parseFloat(reportData.summary.total_usd) || 0) + (parseFloat(reportData.extra_nights_amount) || 0)) - 28).toString())}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-blue-600">25% de base:</span>
