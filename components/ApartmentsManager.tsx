@@ -70,7 +70,7 @@ export const ApartmentsManager: React.FC = () => {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-800">Mis Apartamentos</h2>
+        <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Mis Apartamentos</h2>
         <button onClick={handleAddNew} className="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg flex items-center gap-2">
           <Plus className="w-4 h-4" /> Agregar Apartamento
         </button>
@@ -108,7 +108,7 @@ export const ApartmentsManager: React.FC = () => {
              if(apt.id === 'new_temp' && editingId !== 'new_temp') return null;
 
             return (
-              <div key={apt.id} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex flex-col md:flex-row gap-6">
+              <div key={apt.id} className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 flex flex-col md:flex-row gap-6">
                 <img src={apt.imageUrl} alt={apt.name} className="w-full md:w-48 h-32 object-cover rounded-lg" />
                 <div className="flex-1">
                   <div className="flex justify-between items-start">
@@ -179,9 +179,9 @@ const ApartmentEditor: React.FC<EditorProps> = ({ initialData, onSave, onCancel,
   };
 
   return (
-    <div className="bg-white p-6 rounded-xl shadow-lg border border-brand-200 ring-2 ring-brand-100">
-      <div className="flex justify-between items-center mb-4 border-b pb-2">
-        <h3 className="text-lg font-bold">Editar Información del Apartamento</h3>
+    <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-lg border border-brand-200 dark:border-brand-800 ring-2 ring-brand-100 dark:ring-brand-900">
+      <div className="flex justify-between items-center mb-4 border-b pb-2 dark:border-slate-700">
+        <h3 className="text-lg font-bold dark:text-gray-100">Editar Información del Apartamento</h3>
         <button onClick={onCancel} className="text-gray-400 hover:text-gray-600"><X className="w-6 h-6"/></button>
       </div>
 

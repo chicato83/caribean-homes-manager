@@ -588,8 +588,8 @@ export const ReportsManager: React.FC = () => {
     <div className="max-w-6xl mx-auto p-6">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">Informes Airbnb</h1>
-          <p className="text-gray-500 mt-1">Suba informes de Airbnb y genere resúmenes personalizados</p>
+          <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100">Informes Airbnb</h1>
+          <p className="text-gray-500 dark:text-gray-400 mt-1">Suba informes de Airbnb y genere resúmenes personalizados</p>
         </div>
         {step === 'list' && (
           <button

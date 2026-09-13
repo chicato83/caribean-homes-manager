@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { StorageService } from '../services/storageService';
 import { Apartment, Recommendation } from '../types';
 import { MapPin, Search, Plus, Edit2, Trash2, Save, X, Utensils, Camera, ShoppingBasket, Globe, Image as ImageIcon, Phone } from 'lucide-react';
+import { useToast } from '../contexts/ToastContext';
 
 export const GlobalRecommendationsManager: React.FC = () => {
   const [apartments, setApartments] = useState<Apartment[]>([]);
   const [filterText, setFilterText] = useState('');
   const [filterType, setFilterType] = useState<'All' | 'Restaurant' | 'Attraction' | 'Grocery/Colmado'>('All');
+  const { addToast } = useToast();
   
   // Editor State
   const [isEditing, setIsEditing] = useState(false);
@@ -46,7 +48,7 @@ export const GlobalRecommendationsManager: React.FC = () => {
 
   const handleSave = async () => {
     if (!editingRec || !editingRec.apartmentId || !editingRec.name) {
-        alert("Por favor completa el nombre y selecciona un apartamento.");
+        addToast('warning', "Complete nombre y apartamento.");
         return;
     }
 
@@ -97,11 +99,11 @@ export const GlobalRecommendationsManager: React.FC = () => {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-center gap-4">
         <div>
-            <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+            <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
                 <Globe className="w-6 h-6 text-brand-600" />
                 Descubre los Alrededores
             </h2>
-            <p className="text-gray-500 text-sm">Administra lo que aparece en la página principal y en las guías de apartamentos.</p>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">Administra lo que aparece en la página principal y en las guías de apartamentos.</p>
         </div>
         <button onClick={startAddNew} className="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-lg">
           <Plus className="w-4 h-4" /> Nueva Recomendación

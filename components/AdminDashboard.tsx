@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { LayoutDashboard, Home, ClipboardCheck, Wrench, Package, LogOut, Settings, Globe, FileText } from 'lucide-react';
+import { LayoutDashboard, Home, ClipboardCheck, Wrench, Package, LogOut, Settings, Globe, FileText, Sun, Moon } from 'lucide-react';
 import { ApartmentsManager } from './ApartmentsManager';
 import { CleaningManager } from './CleaningManager';
 import { MaintenanceManager } from './MaintenanceManager';
@@ -9,6 +9,8 @@ import { SettingsManager } from './SettingsManager';
 import { GlobalRecommendationsManager } from './GlobalRecommendationsManager';
 import { ReportsManager } from './ReportsManager';
 import { User, Role } from '../types';
+import { useTheme } from '../contexts/ThemeContext';
+import { SearchBar } from './SearchBar';
 
 interface AdminDashboardProps {
   user: User;
@@ -23,19 +25,36 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, role, onLo
   const [activeTab, setActiveTab] = useState<Tab>(
       role.permissions.includes('manage_apartments') ? 'apartments' : 'cleaning'
   );
+  const { theme, toggleTheme } = useTheme();
+  const [searchQuery, setSearchQuery] = useState('');
 
   const hasPerm = (p: string) => role.permissions.includes(p as any);
 
   return (
-    <div className="flex h-screen bg-gray-100">
+    <div className="flex h-screen bg-gray-100 dark:bg-slate-950">
       {/* Sidebar (Desktop) */}
       <aside className="w-64 bg-slate-900 text-white flex flex-col hidden md:flex">
         <div className="p-6">
-          <h2 className="text-2xl font-bold tracking-tight">Caribean<span className="text-brand-500">Homes</span></h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-bold tracking-tight">Caribean<span className="text-brand-500">Homes</span></h2>
+            <button
+              onClick={toggleTheme}
+              className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              title={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+            >
+              {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            </button>
+          </div>
           <div className="mt-2 flex items-center gap-2">
              <div className="w-2 h-2 rounded-full bg-green-500"></div>
              <p className="text-slate-300 text-xs">Hola, {user.name}</p>
           </div>
+          <SearchBar
+            value={searchQuery}
+            onChange={setSearchQuery}
+            placeholder="Buscar..."
+            className="mt-4"
+          />
         </div>
         <nav className="flex-1 px-4 space-y-2">
           {hasPerm('manage_apartments') && (
@@ -136,7 +155,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, role, onLo
       </div>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto p-4 md:p-8 mt-16 md:mt-0">
+      <main className="flex-1 overflow-y-auto p-4 md:p-8 mt-16 md:mt-0 bg-gray-100 dark:bg-slate-950">
         {activeTab === 'apartments' && hasPerm('manage_apartments') && <ApartmentsManager />}
         {activeTab === 'recommendations' && hasPerm('manage_apartments') && <GlobalRecommendationsManager />}
         {activeTab === 'reports' && hasPerm('manage_apartments') && <ReportsManager />}
@@ -157,6 +176,6 @@ const NavButton: React.FC<{ icon: React.ReactNode, label: string, active: boolea
     }`}
   >
     <div className="w-5 h-5 mr-3">{icon}</div>
-    <span className="font-medium">{label}</span>
+    <span className="font-medium dark:text-slate-200">{label}</span>
   </button>
 );

@@ -1,6 +1,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import { ThemeProvider } from './contexts/ThemeContext';
+import { ToastProvider } from './contexts/ToastContext';
+import { SearchProvider } from './contexts/SearchContext';
+import { ToastContainer } from './components/ToastContainer';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -10,6 +14,13 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <App />
+    <ThemeProvider>
+      <ToastProvider>
+        <SearchProvider>
+          <App />
+          <ToastContainer />
+        </SearchProvider>
+      </ToastProvider>
+    </ThemeProvider>
   </React.StrictMode>
 );

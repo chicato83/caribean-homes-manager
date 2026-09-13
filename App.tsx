@@ -98,13 +98,13 @@ const App: React.FC = () => {
   // --- PERMISSION ERROR SCREEN ---
   if (permissionError) {
       return (
-          <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-6 text-center font-sans">
-              <div className="bg-white p-8 rounded-2xl shadow-xl max-w-2xl border border-red-100">
-                  <div className="bg-red-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
-                      <AlertTriangle className="w-10 h-10 text-red-600" />
+          <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex flex-col items-center justify-center p-6 text-center font-sans">
+              <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-xl max-w-2xl border border-red-100 dark:border-red-900">
+                  <div className="bg-red-100 dark:bg-red-900/30 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+                      <AlertTriangle className="w-10 h-10 text-red-600 dark:text-red-400" />
                   </div>
-                  <h1 className="text-3xl font-bold text-gray-900 mb-4">Configuración Requerida: Supabase</h1>
-                  <p className="text-gray-600 text-lg mb-8">
+                  <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-4">Configuración Requerida: Supabase</h1>
+                  <p className="text-gray-600 dark:text-gray-400 text-lg mb-8">
                       La aplicación está conectada, pero <strong>no tiene permisos</strong> para leer los datos.
                       <br/>
                       Las políticas RLS de tu base de datos están bloqueando el acceso.
@@ -156,17 +156,17 @@ const App: React.FC = () => {
       {/* Login Modal Overlay */}
       {showLogin && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 relative animate-fade-in max-h-[90vh] overflow-y-auto">
-                  <button onClick={() => setShowLogin(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+              <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md p-8 relative animate-fade-in max-h-[90vh] overflow-y-auto">
+                  <button onClick={() => setShowLogin(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
                       <X className="w-6 h-6" />
                   </button>
                   
                   <div className="text-center mb-8">
-                      <div className="bg-brand-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                          <Lock className="w-8 h-8 text-brand-600" />
+                      <div className="bg-brand-100 dark:bg-brand-900/30 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                          <Lock className="w-8 h-8 text-brand-600 dark:text-brand-400" />
                       </div>
-                      <h2 className="text-2xl font-bold text-gray-800">Acceso Administrativo</h2>
-                      <p className="text-gray-500">Ingrese su PIN de seguridad de 4 dígitos</p>
+                      <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Acceso Administrativo</h2>
+                      <p className="text-gray-500 dark:text-gray-400">Ingrese su PIN de seguridad de 4 dígitos</p>
                   </div>
 
                   <form onSubmit={handleLogin} className="space-y-4">
@@ -177,7 +177,7 @@ const App: React.FC = () => {
                             maxLength={8}
                             value={pin}
                             onChange={(e) => setPin(e.target.value)}
-                            className="w-full text-center text-3xl tracking-widest py-3 border-2 border-gray-200 rounded-xl focus:border-brand-500 focus:ring-0 outline-none transition-colors"
+                            className="w-full text-center text-3xl tracking-widest py-3 border-2 border-gray-200 dark:border-slate-600 rounded-xl focus:border-brand-500 focus:ring-0 outline-none transition-colors bg-white dark:bg-slate-700 text-gray-800 dark:text-gray-100"
                             placeholder="••••"
                             autoFocus
                           />

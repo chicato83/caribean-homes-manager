@@ -98,9 +98,9 @@ export const MaintenanceManager: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-gray-800">Mantenimiento de Equipos</h2>
+      <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Mantenimiento de Equipos</h2>
 
-      <div className="bg-white p-6 rounded-lg shadow-sm border">
+      <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-sm border dark:border-slate-700">
          <h3 className="font-semibold text-gray-700 mb-4">Programar Nuevo Mantenimiento</h3>
          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
              <div className="lg:col-span-1">
@@ -172,9 +172,9 @@ export const MaintenanceManager: React.FC = () => {
             const aptName = apartments.find(a => a.id === item.apartmentId)?.name || 'General';
 
             return (
-                <div key={item.id} className={`bg-white p-6 rounded-xl shadow border-l-4 ${isUrgent ? 'border-red-500' : 'border-green-500'}`}>
+                <div key={item.id} className={`bg-white dark:bg-slate-800 p-6 rounded-xl shadow border-l-4 ${isUrgent ? 'border-red-500' : 'border-green-500'}`}>
                     <div className="flex justify-between items-start mb-2">
-                        <h3 className="font-bold text-lg">{item.name}</h3>
+                        <h3 className="font-bold text-lg dark:text-gray-100">{item.name}</h3>
                         <div className="text-right">
                             <span className="block text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">{aptName}</span>
                             {item.areaName && <span className="block text-xs text-brand-600 font-semibold mt-1">{item.areaName}</span>}

@@ -36,7 +36,7 @@ export const GuestView: React.FC<GuestViewProps> = ({ apartments, isLoading = fa
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 font-sans">
+    <div className="min-h-screen bg-gray-50 dark:bg-slate-950 font-sans">
       {/* Hero Section */}
       <div className="relative h-[65vh] flex items-center justify-center text-center px-4">
          <div 
@@ -86,7 +86,7 @@ export const GuestView: React.FC<GuestViewProps> = ({ apartments, isLoading = fa
               ) : apartments.map((apt) => (
                 <div 
                   key={apt.id} 
-                  className="bg-white rounded-3xl shadow-xl overflow-hidden cursor-pointer group transform transition-all duration-300 hover:-translate-y-3 hover:shadow-2xl border border-gray-100"
+                  className="bg-white dark:bg-slate-800 rounded-3xl shadow-xl overflow-hidden cursor-pointer group transform transition-all duration-300 hover:-translate-y-3 hover:shadow-2xl border border-gray-100 dark:border-slate-700"
                   onClick={() => setSelectedApt(apt)}
                 >
                   <div className="relative h-72 overflow-hidden">
@@ -165,7 +165,7 @@ export const GuestView: React.FC<GuestViewProps> = ({ apartments, isLoading = fa
         )}
       </div>
 
-      <footer className="bg-gray-900 text-white py-16 text-center border-t border-gray-800 mt-20">
+      <footer className="bg-gray-900 dark:bg-slate-900 text-white py-16 text-center border-t border-gray-800 dark:border-slate-800 mt-20">
           <div className="mb-8">
               <h2 className="text-2xl font-bold tracking-tight">Caribean<span className="text-brand-500">Homes</span></h2>
           </div>

@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { StorageService } from '../services/storageService';
 import { User, Role, Permission } from '../types';
 import { Shield, Users, Save, Trash2, Plus, Key } from 'lucide-react';
+import { useToast } from '../contexts/ToastContext';
 
 export const SettingsManager: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'users' | 'roles'>('users');
   const [users, setUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
+  const { addToast } = useToast();
 
   // Editing States
   const [editingUser, setEditingUser] = useState<Partial<User> | null>(null);
@@ -27,7 +29,7 @@ export const SettingsManager: React.FC = () => {
 
   const saveUser = async () => {
     if (!editingUser?.name || !editingUser.pin || !editingUser.roleId) {
-        alert("Por favor complete todos los campos (Nombre, PIN, Rol).");
+        addToast('warning', "Complete todos los campos.");
         return;
     }
 
@@ -49,7 +51,7 @@ export const SettingsManager: React.FC = () => {
              const fields = Object.keys(error.data.data).join(', ');
              msg += ` Error en campos: ${fields}. Verifique que el nombre sea único o el PIN válido.`;
         }
-        alert(msg);
+        addToast('error', msg);
     }
   };
 
@@ -94,7 +96,7 @@ export const SettingsManager: React.FC = () => {
 
   return (
     <div className="space-y-6">
-        <h2 className="text-2xl font-bold text-gray-800">Configuración del Sistema</h2>
+        <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Configuración del Sistema</h2>
         
         <div className="flex space-x-4 border-b">
             <button 

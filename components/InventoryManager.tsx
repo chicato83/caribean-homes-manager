@@ -51,8 +51,8 @@ export const InventoryManager: React.FC = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-            <h2 className="text-2xl font-bold text-gray-800">Inventario Maestro</h2>
-            <p className="text-gray-600">Control de stock en almacén.</p>
+            <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Inventario Maestro</h2>
+            <p className="text-gray-600 dark:text-gray-400">Control de stock en almacén.</p>
         </div>
         <button 
             onClick={() => setShowAddForm(!showAddForm)}
@@ -120,7 +120,7 @@ export const InventoryManager: React.FC = () => {
         </div>
       )}
 
-      <div className="bg-white rounded-xl shadow overflow-hidden">
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow overflow-hidden border border-gray-200 dark:border-slate-700">
         <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
                 <tr>

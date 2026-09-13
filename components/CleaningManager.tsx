@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { StorageService } from '../services/storageService';
 import { Apartment, CleaningLog, InventoryStatus, CleaningTemplate, CleaningTemplateRoom, InventoryItem, Role } from '../types';
 import { CheckCircle, Plus, Trash2, Clipboard, Save, ArrowRight, X, AlertTriangle, AlertCircle, ChevronDown, ChevronUp, Calendar, DollarSign, Clock } from 'lucide-react';
+import { useToast } from '../contexts/ToastContext';
 
 interface CleaningManagerProps {
     role?: Role;
@@ -27,7 +28,7 @@ export const CleaningManager: React.FC<CleaningManagerProps> = ({ role }) => {
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-        <h2 className="text-2xl font-bold text-gray-800">Gestión de Limpieza</h2>
+        <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Gestión de Limpieza</h2>
         <div className="flex gap-2">
             {activeMode === 'list' && (
                 <>
@@ -350,6 +351,7 @@ const PerformCleaning: React.FC<{apartments: Apartment[], onComplete: () => void
     const [template, setTemplate] = useState<CleaningTemplate | null>(null);
     // Inspection State: { [itemId]: { quantityFound, status } }
     const [inspectionData, setInspectionData] = useState<Record<string, { qty: number, status: InventoryStatus }>>({});
+    const { addToast } = useToast();
 
     const startSession = async (aptId: string) => {
         if (!aptId) {
@@ -388,7 +390,7 @@ const PerformCleaning: React.FC<{apartments: Apartment[], onComplete: () => void
         }
 
         if(!tpl) {
-             alert("No se pudo cargar la lista de verificación.");
+             addToast('error', "No se pudo cargar la lista de verificación.");
              return;
         }
 
@@ -405,7 +407,7 @@ const PerformCleaning: React.FC<{apartments: Apartment[], onComplete: () => void
 
     const handleSubmit = async () => {
         if (!selectedAptId) {
-            alert("Error: No se ha seleccionado un apartamento.");
+            addToast('warning', "Seleccione un apartamento.");
             return;
         }
 
@@ -428,7 +430,7 @@ const PerformCleaning: React.FC<{apartments: Apartment[], onComplete: () => void
         }
 
         if (missingFields.length > 0) {
-            alert(`Faltan los siguientes campos por completar:\n\n- ${missingFields.join('\n- ')}`);
+            addToast('warning', `Faltan campos: ${missingFields.join(', ')}`);
             return;
         }
 
