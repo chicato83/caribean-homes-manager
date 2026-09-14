@@ -1,0 +1,21 @@
+{
+  "name": "Caribean Homes Manager",
+  "short_name": "CH Manager",
+  "description": "Administración de propiedades de alquiler vacacional",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "/assets/caribean-homes-logo.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/assets/caribean-homes-logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
