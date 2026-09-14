@@ -168,3 +168,23 @@ export interface SavedReport {
   generatedAt: string;
   reportData: ReportData;
 }
+
+// Dashboard & Calendar Types
+export interface DashboardMetrics {
+  totalApartments: number;
+  totalRevenue: number;
+  pendingCleanings: number;
+  maintenanceAlerts: number;
+  lowInventoryItems: number;
+  recentActivity: CleaningLog[];
+  monthlyRevenue: { month: string; amount: number }[];
+}
+
+export interface CalendarEvent {
+  id: string;
+  date: string; // YYYY-MM-DD
+  type: 'cleaning' | 'maintenance';
+  apartmentName: string;
+  title: string;
+  details: string;
+}

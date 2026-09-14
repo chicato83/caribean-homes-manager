@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { Apartment, CleaningLog, InventoryItem, MaintenanceItem, CleaningTemplate, User, Role, Recommendation, InventoryStatus, SavedReport, ReportData } from '../types';
+import { Apartment, CleaningLog, InventoryItem, MaintenanceItem, CleaningTemplate, User, Role, Recommendation, InventoryStatus, SavedReport, ReportData, DashboardMetrics, CalendarEvent } from '../types';
 
 // --- Helper: Map Supabase snake_case rows to app camelCase objects ---
 
@@ -644,5 +644,110 @@ export const StorageService = {
     } catch {
       // Supabase not available
     }
+  },
+
+  // --- DASHBOARD & CALENDAR ---
+
+  getDashboardMetrics: async (): Promise<DashboardMetrics> => {
+    const [apartments, cleaningLogs, maintenance, inventory, reports] = await Promise.all([
+      StorageService.getApartments(),
+      StorageService.getCleaningLogs(),
+      StorageService.getMaintenance(),
+      StorageService.getInventory(),
+      StorageService.getReports(),
+    ]);
+
+    // Total revenue from reports
+    const totalRevenue = reports.reduce((sum, r) => sum + (parseFloat(r.reportData.summary.total_usd) || 0), 0);
+
+    // Pending cleanings
+    const pendingCleanings = cleaningLogs.filter(log => log.paymentStatus === 'Pending').length;
+
+    // Maintenance alerts (overdue)
+    const today = new Date();
+    const maintenanceAlerts = maintenance.filter(item => {
+      const lastDate = new Date(item.lastMaintenanceDate);
+      const nextDue = new Date(lastDate);
+      nextDue.setDate(nextDue.getDate() + item.frequencyDays);
+      return nextDue <= today;
+    }).length;
+
+    // Low inventory
+    const lowInventoryItems = inventory.filter(item => item.totalQuantity <= item.minThreshold).length;
+
+    // Recent activity (last 5 cleaning logs)
+    const recentActivity = [...cleaningLogs]
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 5);
+
+    // Monthly revenue (last 6 months)
+    const monthlyRevenue: { month: string; amount: number }[] = [];
+    const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date();
+      d.setMonth(d.getMonth() - i);
+      const monthLabel = monthNames[d.getMonth()];
+      const amount = reports
+        .filter(r => r.period && r.period.toLowerCase().includes(monthNames[d.getMonth()].toLowerCase()))
+        .reduce((sum, r) => sum + (parseFloat(r.reportData.summary.total_usd) || 0), 0);
+      monthlyRevenue.push({ month: monthLabel, amount });
+    }
+
+    return {
+      totalApartments: apartments.length,
+      totalRevenue,
+      pendingCleanings,
+      maintenanceAlerts,
+      lowInventoryItems,
+      recentActivity,
+      monthlyRevenue,
+    };
+  },
+
+  getCalendarEvents: async (month: number, year: number): Promise<CalendarEvent[]> => {
+    const events: CalendarEvent[] = [];
+    const [apartments, cleaningLogs, maintenance] = await Promise.all([
+      StorageService.getApartments(),
+      StorageService.getCleaningLogs(),
+      StorageService.getMaintenance(),
+    ]);
+
+    const aptMap = new Map(apartments.map(a => [a.id, a.name]));
+    const monthStr = String(month + 1).padStart(2, '0');
+
+    // Cleaning logs for this month
+    cleaningLogs.forEach(log => {
+      const logDate = new Date(log.date);
+      if (logDate.getMonth() === month && logDate.getFullYear() === year) {
+        events.push({
+          id: `clean-${log.id}`,
+          date: `${year}-${monthStr}-${String(logDate.getDate()).padStart(2, '0')}`,
+          type: 'cleaning',
+          apartmentName: aptMap.get(log.apartmentId) || 'Desconocido',
+          title: `Limpieza - ${log.cleanerName}`,
+          details: `Estado: ${log.paymentStatus}`,
+        });
+      }
+    });
+
+    // Maintenance - compute next due dates
+    maintenance.forEach(item => {
+      const lastDate = new Date(item.lastMaintenanceDate);
+      const nextDue = new Date(lastDate);
+      nextDue.setDate(nextDue.getDate() + item.frequencyDays);
+      
+      if (nextDue.getMonth() === month && nextDue.getFullYear() === year) {
+        events.push({
+          id: `maint-${item.id}`,
+          date: `${year}-${monthStr}-${String(nextDue.getDate()).padStart(2, '0')}`,
+          type: 'maintenance',
+          apartmentName: aptMap.get(item.apartmentId || '') || 'General',
+          title: `Mantenimiento - ${item.name}`,
+          details: `Frecuencia: cada ${item.frequencyDays} días${item.technicianContact ? ` | Técnico: ${item.technicianContact}` : ''}`,
+        });
+      }
+    });
+
+    return events;
   },
 };
