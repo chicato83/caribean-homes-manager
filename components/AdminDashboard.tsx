@@ -1,19 +1,20 @@
 
-import React, { useState } from 'react';
+import React, { useState, lazy, Suspense } from 'react';
 import { LayoutDashboard, Home, ClipboardCheck, Wrench, Package, LogOut, Settings, Globe, FileText, Sun, Moon, Calendar, Download } from 'lucide-react';
-import { ApartmentsManager } from './ApartmentsManager';
-import { CleaningManager } from './CleaningManager';
-import { MaintenanceManager } from './MaintenanceManager';
-import { InventoryManager } from './InventoryManager';
-import { SettingsManager } from './SettingsManager';
-import { GlobalRecommendationsManager } from './GlobalRecommendationsManager';
-import { ReportsManager } from './ReportsManager';
-import { DashboardOverview } from './DashboardOverview';
-import { CalendarView } from './CalendarView';
-import { ExportManager } from './ExportManager';
 import { User, Role } from '../types';
 import { useTheme } from '../contexts/ThemeContext';
 import { SearchBar } from './SearchBar';
+
+const DashboardOverview = lazy(() => import('./DashboardOverview').then(m => ({ default: m.DashboardOverview })));
+const ApartmentsManager = lazy(() => import('./ApartmentsManager').then(m => ({ default: m.ApartmentsManager })));
+const GlobalRecommendationsManager = lazy(() => import('./GlobalRecommendationsManager').then(m => ({ default: m.GlobalRecommendationsManager })));
+const ReportsManager = lazy(() => import('./ReportsManager').then(m => ({ default: m.ReportsManager })));
+const CleaningManager = lazy(() => import('./CleaningManager').then(m => ({ default: m.CleaningManager })));
+const MaintenanceManager = lazy(() => import('./MaintenanceManager').then(m => ({ default: m.MaintenanceManager })));
+const InventoryManager = lazy(() => import('./InventoryManager').then(m => ({ default: m.InventoryManager })));
+const SettingsManager = lazy(() => import('./SettingsManager').then(m => ({ default: m.SettingsManager })));
+const ExportManager = lazy(() => import('./ExportManager').then(m => ({ default: m.ExportManager })));
+const CalendarView = lazy(() => import('./CalendarView').then(m => ({ default: m.CalendarView })));
 
 interface AdminDashboardProps {
   user: User;
@@ -178,16 +179,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, role, onLo
 
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto p-4 md:p-8 mt-16 md:mt-0 bg-gray-100 dark:bg-slate-950">
-        {activeTab === 'overview' && <DashboardOverview />}
-        {activeTab === 'calendar' && <CalendarView />}
-        {activeTab === 'apartments' && hasPerm('manage_apartments') && <ApartmentsManager />}
-        {activeTab === 'recommendations' && hasPerm('manage_apartments') && <GlobalRecommendationsManager />}
-        {activeTab === 'reports' && hasPerm('manage_apartments') && <ReportsManager />}
-        {activeTab === 'export' && hasPerm('manage_apartments') && <ExportManager />}
-        {activeTab === 'cleaning' && (hasPerm('manage_cleaning') || hasPerm('perform_cleaning')) && <CleaningManager role={role} />}
-        {activeTab === 'maintenance' && hasPerm('manage_maintenance') && <MaintenanceManager />}
-        {activeTab === 'inventory' && hasPerm('manage_inventory') && <InventoryManager />}
-        {activeTab === 'settings' && hasPerm('manage_settings') && <SettingsManager />}
+        <Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>}>
+          {activeTab === 'overview' && <DashboardOverview />}
+          {activeTab === 'calendar' && <CalendarView />}
+          {activeTab === 'apartments' && hasPerm('manage_apartments') && <ApartmentsManager />}
+          {activeTab === 'recommendations' && hasPerm('manage_apartments') && <GlobalRecommendationsManager />}
+          {activeTab === 'reports' && hasPerm('manage_apartments') && <ReportsManager />}
+          {activeTab === 'export' && hasPerm('manage_apartments') && <ExportManager />}
+          {activeTab === 'cleaning' && (hasPerm('manage_cleaning') || hasPerm('perform_cleaning')) && <CleaningManager role={role} />}
+          {activeTab === 'maintenance' && hasPerm('manage_maintenance') && <MaintenanceManager />}
+          {activeTab === 'inventory' && hasPerm('manage_inventory') && <InventoryManager />}
+          {activeTab === 'settings' && hasPerm('manage_settings') && <SettingsManager />}
+        </Suspense>
       </main>
     </div>
   );
