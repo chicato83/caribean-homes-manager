@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS apartments (
   max_guests INT DEFAULT 2,
   house_rules TEXT,
   notes TEXT,
+  ical_url TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

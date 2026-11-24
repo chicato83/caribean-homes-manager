@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { StorageService } from '../services/storageService';
 import { GeminiService } from '../services/geminiService';
 import { Apartment, Recommendation } from '../types';
+import { useToast } from '../contexts/ToastContext';
 import { Plus, Trash2, Edit2, Wand2, Save, X, Utensils, Camera, ShoppingBasket, Map, ChevronDown, ChevronUp } from 'lucide-react';
 
 export const ApartmentsManager: React.FC = () => {
@@ -9,6 +10,7 @@ export const ApartmentsManager: React.FC = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [recEditingId, setRecEditingId] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const { addToast } = useToast();
 
   const loadApartments = async () => {
     try {
@@ -25,7 +27,11 @@ export const ApartmentsManager: React.FC = () => {
   const handleSave = async (apt: Apartment) => {
     if (editingId) {
         // Saving Apartment Details
-        await StorageService.saveApartment(apt);
+        const saved = await StorageService.saveApartment(apt);
+        if (!saved) {
+            addToast('error', 'No se pudo guardar. Si es la primera vez que usas Airbnb, ejecuta la migración supabase-migration-airbnb-ical.sql en Supabase.');
+            return;
+        }
     } else if (recEditingId) {
         // Saving Recommendations
         await StorageService.syncRecommendations(apt.id, apt.recommendations);
@@ -115,6 +121,11 @@ export const ApartmentsManager: React.FC = () => {
                     <div>
                       <h3 className="text-xl font-bold text-gray-900">{apt.name}</h3>
                       <p className="text-gray-500">{apt.address}</p>
+                      {apt.icalUrl && (
+                        <span className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-900/30 px-2 py-1 rounded-full">
+                          📅 Airbnb conectado
+                        </span>
+                      )}
                     </div>
                     <div className="flex gap-2">
                        <button 
@@ -289,6 +300,19 @@ const ApartmentEditor: React.FC<EditorProps> = ({ initialData, onSave, onCancel,
                 onChange={e => setFormData({...formData, houseRules: e.target.value})}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2" 
                 placeholder="No fumar, no fiestas..."
+            />
+        </div>
+        <div className="md:col-span-2 bg-slate-50 dark:bg-slate-900/40 p-4 rounded-lg border border-slate-200 dark:border-slate-700">
+            <label className="block text-sm font-medium text-gray-700 dark:text-slate-200">Sincronización de calendario (Airbnb)</label>
+            <p className="text-xs text-gray-500 dark:text-slate-400 mt-1 mb-2 leading-relaxed">
+              En Airbnb: Calendario → Exportar calendario → copiar el enlace iCal. Las reservas aparecerán en el Calendario de esta app.
+            </p>
+            <input
+              type="url"
+              placeholder="https://www.airbnb.com/calendar/ical/..."
+              value={formData.icalUrl || ''}
+              onChange={e => setFormData({ ...formData, icalUrl: e.target.value })}
+              className="mt-1 block w-full rounded-md border-gray-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-2"
             />
         </div>
         <div className="md:col-span-2">

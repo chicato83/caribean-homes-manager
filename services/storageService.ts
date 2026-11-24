@@ -24,6 +24,7 @@ const mapApartmentRow = (r: any, recs: any[] = []): Apartment => ({
   maxGuests: r.max_guests || 2,
   houseRules: r.house_rules,
   notes: r.notes || '',
+  icalUrl: r.ical_url || '',
 });
 
 const mapRecommendationRow = (r: any): Recommendation => ({
@@ -99,6 +100,7 @@ const toApartmentRow = (apt: Apartment) => ({
   max_guests: Math.round(Number(apt.maxGuests) || 2),
   house_rules: apt.houseRules,
   notes: apt.notes,
+  ical_url: apt.icalUrl?.trim() || null,
 });
 
 const toRecommendationRow = (rec: Recommendation, apartmentId: string) => ({

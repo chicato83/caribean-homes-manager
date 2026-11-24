@@ -37,6 +37,7 @@ export interface Apartment {
   maxGuests?: number;
   houseRules?: string;
   notes: string; // Internal admin notes
+  icalUrl?: string; // Airbnb iCal sync URL (read-only calendar feed)
 }
 
 export interface InventoryItem {
@@ -183,7 +184,7 @@ export interface DashboardMetrics {
 export interface CalendarEvent {
   id: string;
   date: string; // YYYY-MM-DD
-  type: 'cleaning' | 'maintenance';
+  type: 'cleaning' | 'maintenance' | 'booking';
   apartmentName: string;
   title: string;
   details: string;

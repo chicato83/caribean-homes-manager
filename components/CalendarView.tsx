@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { StorageService } from '../services/storageService';
+import { IcalService } from '../services/icalService';
 import { CalendarEvent } from '../types';
-import { ChevronLeft, ChevronRight, X, Calendar } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, Calendar, RefreshCw } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useToast } from '../contexts/ToastContext';
 
@@ -13,10 +14,15 @@ export const CalendarView: React.FC = () => {
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
   const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [airbnbEvents, setAirbnbEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [lastSync, setLastSync] = useState<number | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const { theme } = useTheme();
   const { addToast } = useToast();
+
+  const allEvents = useMemo(() => [...events, ...airbnbEvents], [events, airbnbEvents]);
 
   const loadEvents = useCallback(async () => {
     setLoading(true);
@@ -28,11 +34,38 @@ export const CalendarView: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentMonth, currentYear]);
+  }, [currentMonth, currentYear, addToast]);
+
+  const syncAirbnb = useCallback(async (force = false) => {
+    setSyncing(true);
+    try {
+      const apartments = await StorageService.getApartments();
+      const result = await IcalService.getAirbnbEvents(apartments, { force });
+      setAirbnbEvents(result.events);
+      setLastSync(result.syncedAt);
+
+      if (force) {
+        if (result.errors.length > 0) {
+          addToast('warning', `Airbnb: ${result.errors[0]}`);
+        } else {
+          addToast('success', `Airbnb sincronizado (${result.events.length} días reservados)`);
+        }
+      }
+    } catch (error) {
+      console.error('Airbnb sync error:', error);
+      if (force) addToast('error', 'No se pudo sincronizar con Airbnb');
+    } finally {
+      setSyncing(false);
+    }
+  }, [addToast]);
 
   useEffect(() => {
     loadEvents();
   }, [loadEvents]);
+
+  useEffect(() => {
+    syncAirbnb(false);
+  }, [syncAirbnb]);
 
   const goToPrevMonth = () => {
     if (currentMonth === 0) {
@@ -72,7 +105,7 @@ export const CalendarView: React.FC = () => {
 
   const getEventsForDate = (day: number) => {
     const dateKey = formatDateKey(day);
-    return events.filter(e => e.date === dateKey);
+    return allEvents.filter(e => e.date === dateKey);
   };
 
   const calendarDays: { day: number; isCurrentMonth: boolean; dateKey: string }[] = [];
@@ -106,16 +139,52 @@ export const CalendarView: React.FC = () => {
     });
   }
 
-  const selectedDateEvents = selectedDate ? events.filter(e => e.date === selectedDate) : [];
+  const selectedDateEvents = selectedDate ? allEvents.filter(e => e.date === selectedDate) : [];
   const isToday = (day: number) => day === today.getDate() && currentMonth === today.getMonth() && currentYear === today.getFullYear();
+
+  const eventChipStyle = (type: CalendarEvent['type']) =>
+    type === 'cleaning'
+      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+      : type === 'booking'
+        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+        : 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300';
+
+  const eventDetailStyle = (type: CalendarEvent['type']) =>
+    type === 'cleaning'
+      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/10'
+      : type === 'booking'
+        ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/10'
+        : 'border-orange-500 bg-orange-50 dark:bg-orange-900/10';
+
+  const eventLabel = (type: CalendarEvent['type']) =>
+    type === 'cleaning' ? 'Limpieza' : type === 'booking' ? 'Reserva Airbnb' : 'Mantenimiento';
+
+  const eventIcon = (type: CalendarEvent['type']) =>
+    type === 'cleaning' ? '🧹' : type === 'booking' ? '🏠' : '🔧';
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
           <Calendar className="w-6 h-6 text-brand-500" /> Calendario
         </h1>
+        <div className="flex items-center gap-3">
+          {lastSync && !syncing && (
+            <span className="text-xs text-slate-500 dark:text-slate-400">
+              Airbnb: {new Date(lastSync).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          )}
+          <button
+            onClick={() => syncAirbnb(true)}
+            disabled={syncing}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-brand-600 hover:bg-brand-700 disabled:opacity-60 text-white text-sm font-medium transition-colors"
+            title="Volver a importar las reservas desde los enlaces iCal de Airbnb"
+          >
+            <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+            {syncing ? 'Sincronizando...' : 'Sincronizar Airbnb'}
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -197,14 +266,10 @@ export const CalendarView: React.FC = () => {
                       {visibleEvents.map(event => (
                         <div
                           key={event.id}
-                          className={`text-[10px] leading-tight px-1 py-0.5 rounded truncate ${
-                            event.type === 'cleaning'
-                              ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
-                              : 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'
-                          }`}
+                          className={`text-[10px] leading-tight px-1 py-0.5 rounded truncate ${eventChipStyle(event.type)}`}
                           title={`${event.title} - ${event.apartmentName}`}
                         >
-                          {event.type === 'cleaning' ? '🧹' : '🔧'} {event.apartmentName}
+                          {eventIcon(event.type)} {event.apartmentName}
                         </div>
                       ))}
                       {extraCount > 0 && (
@@ -226,6 +291,9 @@ export const CalendarView: React.FC = () => {
             </span>
             <span className="flex items-center gap-1">
               <span className="w-3 h-3 rounded-full bg-orange-500" /> Mantenimiento
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-3 h-3 rounded-full bg-emerald-500" /> Reserva Airbnb
             </span>
           </div>
         </div>
@@ -262,11 +330,7 @@ export const CalendarView: React.FC = () => {
               {selectedDateEvents.map(event => (
                 <div
                   key={event.id}
-                  className={`p-4 rounded-lg border-l-4 ${
-                    event.type === 'cleaning'
-                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/10'
-                      : 'border-orange-500 bg-orange-50 dark:bg-orange-900/10'
-                  }`}
+                  className={`p-4 rounded-lg border-l-4 ${eventDetailStyle(event.type)}`}
                 >
                   <div className="flex items-start justify-between">
                     <div>
@@ -275,13 +339,9 @@ export const CalendarView: React.FC = () => {
                       <p className="text-xs text-slate-500 dark:text-slate-500 mt-2">{event.details}</p>
                     </div>
                     <span
-                      className={`text-xs font-medium px-2 py-1 rounded-full ${
-                        event.type === 'cleaning'
-                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
-                          : 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'
-                      }`}
+                      className={`text-xs font-medium px-2 py-1 rounded-full ${eventChipStyle(event.type)}`}
                     >
-                      {event.type === 'cleaning' ? 'Limpieza' : 'Mantenimiento'}
+                      {eventLabel(event.type)}
                     </span>
                   </div>
                 </div>
