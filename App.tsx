@@ -138,9 +138,9 @@ const App: React.FC = () => {
 
   if (isInitializing) {
       return (
-        <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
+        <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-slate-950">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-600 mb-4"></div>
-            <p className="text-gray-400 font-medium">Conectando con Supabase...</p>
+            <p className="text-gray-400 dark:text-slate-400 font-medium">Conectando con Supabase...</p>
         </div>
       );
   }
