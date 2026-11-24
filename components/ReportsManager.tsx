@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 import html2pdf from 'html2pdf.js';
-import { Upload, FileText, Plus, Trash2, Eye, Printer, Download, ArrowLeft, CheckCircle, AlertCircle, Edit2 } from 'lucide-react';
+import { Upload, FileText, Plus, Trash2, Eye, Printer, Download, ArrowLeft, CheckCircle, AlertCircle, Edit2, Loader2 } from 'lucide-react';
 import { StorageService } from '../services/storageService';
+import { normalizeColorsForPdf } from '../services/pdfExport';
 import { Apartment, SavedReport, ReportData } from '../types';
 
 // Configure pdf.js worker
@@ -45,6 +46,7 @@ export const ReportsManager: React.FC = () => {
   const [reportData, setReportData] = useState<ReportData>(INITIAL_REPORT_DATA);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [rateLoading, setRateLoading] = useState(false);
   const [rateSource, setRateSource] = useState<string | null>(null);
@@ -307,35 +309,37 @@ export const ReportsManager: React.FC = () => {
     if (!printContent) return;
 
     const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
+    if (!printWindow) {
+      setError('El navegador bloqueó la ventana de impresión. Permita ventanas emergentes e intente nuevamente.');
+      return;
+    }
+
+    // Reuse the app stylesheets so the report keeps its Tailwind styling.
+    const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
+      .map(node => {
+        if (node instanceof HTMLLinkElement) {
+          const href = node.getAttribute('href');
+          if (!href) return '';
+          const link = node.cloneNode(false) as HTMLLinkElement;
+          link.href = new URL(href, window.location.href).href;
+          return link.outerHTML;
+        }
+        return node.outerHTML;
+      })
+      .join('\n');
 
     printWindow.document.write(`
       <!DOCTYPE html>
-      <html>
+      <html lang="es">
       <head>
+        <meta charset="UTF-8" />
         <title>Informe ${viewingReport?.apartmentName || ''} - ${reportData.period}</title>
         <style>
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { font-family: 'Segoe UI', system-ui, sans-serif; color: #1f2937; padding: 20px; }
-          .header { display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #0284c7; padding-bottom: 15px; margin-bottom: 20px; }
-          .logos { display: flex; align-items: center; gap: 20px; }
-          .logo { height: 50px; }
-          .title { text-align: right; }
-          .title h1 { font-size: 22px; color: #0284c7; }
-          .title p { font-size: 12px; color: #6b7280; }
-          .section { margin-bottom: 20px; }
-          .section h3 { font-size: 14px; color: #6b7280; text-transform: uppercase; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px; margin-bottom: 10px; }
-          .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-          .item { display: flex; justify-content: space-between; padding: 6px 10px; background: #f9fafb; border-radius: 4px; }
-          .item-label { color: #6b7280; font-size: 13px; }
-          .item-value { font-weight: 600; font-size: 13px; }
-          .total { background: #ecfdf5; border: 1px solid #bbf7d0; }
-          .total .item-value { color: #059669; font-size: 16px; }
-          .conversion { background: #eff6ff; border: 1px solid #bfdbfe; }
-          .conversion .item-value { color: #2563eb; font-size: 16px; }
-          .footer { margin-top: 30px; padding-top: 15px; border-top: 1px solid #e5e7eb; font-size: 11px; color: #9ca3af; text-align: center; }
+          @page { size: A4; margin: 10mm; }
+          body { background: #fff; }
           @media print { body { padding: 0; } }
         </style>
+        ${styles}
       </head>
       <body>
         ${printContent.innerHTML}
@@ -343,25 +347,47 @@ export const ReportsManager: React.FC = () => {
       </html>
     `);
     printWindow.document.close();
-    printWindow.print();
+    printWindow.focus();
+    // Give the copied stylesheets a moment to load before opening the dialog.
+    setTimeout(() => printWindow.print(), 250);
   };
 
   const handleDownloadPDF = async () => {
     const content = reportRef.current;
-    if (!content) return;
+    if (!content || downloadingPdf) return;
 
-    const filename = `Informe_${viewingReport?.apartmentName || selectedApartment?.name || 'reporte'}_${reportData.period || 'sin-periodo'}.pdf`;
+    setDownloadingPdf(true);
+    setError(null);
+
+    const safeName = (viewingReport?.apartmentName || selectedApartment?.name || 'reporte')
+      .replace(/[\\/:*?"<>|]/g, '_')
+      .trim();
+    const safePeriod = (reportData.period || 'sin-periodo').replace(/[\\/:*?"<>|]/g, '_').trim();
+    const filename = `Informe_${safeName}_${safePeriod}.pdf`;
 
     const options = {
       margin: 10,
       filename,
       image: { type: 'jpeg' as const, quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true },
+      html2canvas: {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        // Tailwind v4 uses oklch(); html2canvas cannot parse it and fails silently.
+        onclone: (clonedDoc: Document) => normalizeColorsForPdf(clonedDoc),
+      },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' as const },
       pagebreak: { mode: ['css', 'legacy'], before: ['.liquidacion-section'] },
     };
 
-    await html2pdf().set(options).from(content).save();
+    try {
+      await html2pdf().set(options).from(content).save();
+    } catch (err) {
+      console.error('Error al generar el PDF:', err);
+      setError('No se pudo generar el archivo PDF. Intente nuevamente o utilice el botón Imprimir y guardar como PDF desde el navegador.');
+    } finally {
+      setDownloadingPdf(false);
+    }
   };
 
   const formatCurrency = (amount: string) => {
@@ -873,8 +899,13 @@ export const ReportsManager: React.FC = () => {
             <button onClick={handlePrint} className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors flex items-center gap-2 font-medium">
               <Printer className="w-4 h-4" /> Imprimir
             </button>
-            <button onClick={handleDownloadPDF} className="px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors flex items-center gap-2 font-medium">
-              <Download className="w-4 h-4" /> Descargar PDF
+            <button
+              onClick={handleDownloadPDF}
+              disabled={downloadingPdf}
+              className="px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 disabled:opacity-60 disabled:cursor-not-allowed transition-colors flex items-center gap-2 font-medium"
+            >
+              {downloadingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+              {downloadingPdf ? 'Generando PDF...' : 'Descargar PDF'}
             </button>
             <button onClick={() => handleDelete(viewingReport.id)} className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors flex items-center gap-2 font-medium">
               <Trash2 className="w-4 h-4" /> Eliminar
