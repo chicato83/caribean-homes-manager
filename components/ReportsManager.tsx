@@ -305,51 +305,27 @@ export const ReportsManager: React.FC = () => {
   };
 
   const handlePrint = () => {
-    const printContent = reportRef.current;
-    if (!printContent) return;
+    const content = reportRef.current;
+    if (!content) return;
 
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      setError('El navegador bloqueó la ventana de impresión. Permita ventanas emergentes e intente nuevamente.');
-      return;
-    }
+    // Print the exact same DOM with the app's own styles. Opening a separate
+    // window with copied CSS produced a different-looking report.
+    const portal = document.createElement('div');
+    portal.id = 'print-report-portal';
+    portal.appendChild(content.cloneNode(true));
+    document.body.appendChild(portal);
 
-    // Reuse the app stylesheets so the report keeps its Tailwind styling.
-    const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
-      .map(node => {
-        if (node instanceof HTMLLinkElement) {
-          const href = node.getAttribute('href');
-          if (!href) return '';
-          const link = node.cloneNode(false) as HTMLLinkElement;
-          link.href = new URL(href, window.location.href).href;
-          return link.outerHTML;
-        }
-        return node.outerHTML;
-      })
-      .join('\n');
-
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html lang="es">
-      <head>
-        <meta charset="UTF-8" />
-        <title>Informe ${viewingReport?.apartmentName || ''} - ${reportData.period}</title>
-        <style>
-          @page { size: A4; margin: 10mm; }
-          body { background: #fff; }
-          @media print { body { padding: 0; } }
-        </style>
-        ${styles}
-      </head>
-      <body>
-        ${printContent.innerHTML}
-      </body>
-      </html>
-    `);
-    printWindow.document.close();
-    printWindow.focus();
-    // Give the copied stylesheets a moment to load before opening the dialog.
-    setTimeout(() => printWindow.print(), 250);
+    let cleaned = false;
+    const cleanup = () => {
+      if (cleaned) return;
+      cleaned = true;
+      portal.remove();
+      window.removeEventListener('afterprint', cleanup);
+    };
+    window.addEventListener('afterprint', cleanup);
+    window.print();
+    // Safari does not always fire `afterprint`.
+    window.setTimeout(cleanup, 60_000);
   };
 
   const handleDownloadPDF = async () => {

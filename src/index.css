@@ -97,3 +97,40 @@
   background: #3b82f6;
   border-radius: 0 4px 4px 0;
 }
+
+/* Print reports: reuse the exact DOM/styling shown on screen */
+#print-report-portal {
+  display: none;
+}
+
+@page {
+  size: A4;
+  margin: 10mm;
+}
+
+@media print {
+  html,
+  body {
+    background: #fff !important;
+  }
+
+  body > *:not(#print-report-portal) {
+    display: none !important;
+  }
+
+  #print-report-portal {
+    display: block !important;
+    width: 100%;
+  }
+
+  #print-report-portal > div {
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+
+  #print-report-portal .liquidacion-section {
+    break-before: page;
+    page-break-before: always;
+  }
+}
